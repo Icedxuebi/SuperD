@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { MerchantRow } from "@/lib/types";
+import type { MerchantRow } from "@/lib/top100-types";
 
 type SortKey = "rank" | "mid" | "merchantName" | "partner" | "totalAmount";
 type SortDir = "asc" | "desc";

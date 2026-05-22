@@ -3,7 +3,7 @@
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
-import type { MerchantRow } from "@/lib/types";
+import type { MerchantRow } from "@/lib/top100-types";
 
 // Anypay brand red leads; gold + cool tones support without competing
 const COLORS = [
