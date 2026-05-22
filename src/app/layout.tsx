@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 
 export const metadata: Metadata = {
-  title: "Secret D — Anypay Internal Tools",
+  title: "Super D — Anypay Internal Tools",
   description: "Internal tools for Application Support, Operation, Risk Management and Finance.",
 };
 
