@@ -1,4 +1,4 @@
-# Secret D
+# Super D
 
 Internal Anypay tooling — Next.js 15 + Tailwind dashboard that reads directly from the production PostgreSQL replica. Styled per `docs/template.md`.
 
