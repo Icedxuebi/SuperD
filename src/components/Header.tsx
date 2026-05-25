@@ -11,6 +11,8 @@ const applicationSupport: NavItem[] = [
 ];
 
 const operation: NavItem[] = [
+  { label: "Check Duplicate Tax ID", href: "/operation/duplicate-tax-id" },
+  { label: "Check Duplicate Phone Number", href: "/operation/duplicate-phone" },
   { label: "Onboarding Queue" },
   { label: "Reconciliation" },
 ];
@@ -18,6 +20,7 @@ const operation: NavItem[] = [
 const riskManagement: NavItem[] = [
   { label: "Police Case Query", href: "/risk-management/police-case" },
   { label: "Top Merchant Transaction", href: "/risk-management/top-100-merchants" },
+  { label: "No Transaction 90 / 120", href: "/risk-management/no-transaction" },
   { label: "Blacklist" },
   { label: "Fraud Monitoring" },
 ];

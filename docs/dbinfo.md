@@ -38,7 +38,19 @@ merchant_info.id        ← merchant_rate.merchant_id          (1:1)
 merchant_info.id        ← transfer_due.merchant_id           (1:1)
 merchant_info.id        ← users.merchant_id
 merchant_info.id        ← invoice.merchant_id
+merchant_info.id        ← merchant_personal_info.merchant_id (1:N — multiple persons per merchant for companies; one per individual)
+merchant_info.id        ← merchant_setting_rate.merchant_id  (1:N — rate-history rows, one current via is_default=true)
 merchant_info.partner_id → partner_info.id
+
+# master_data lookups (all reference master_data.id directly; see "master_data Foreign Key Patterns" below)
+merchant_info.bank_id              → master_data.id  (key1='BANK')
+merchant_info.bank_account_type_id → master_data.id  (key1='BANK_ACCOUNT_TYPE')
+merchant_info.ip_host_country      → master_data.id  (key1='COUNTRY')
+merchant_info.business_category_id → master_data.id  (key1='BUSINESS_CATEGORY')
+merchant_info.business_group_id    → master_data.id  (key1='BUSINESS_GROUP')
+merchant_info.company_type_id      → master_data.id  (key1='COMPANY_TYPE')
+merchant_personal_info.title_name_id → master_data.id (key1='TITLE_NAME')
+merchant_personal_info.job_id        → master_data.id (key1='JOB')
 
 partner_info.id         ← partner_rate.partner_id            (1:1)
 partner_info.id         ← users.partner_id
@@ -536,6 +548,113 @@ The `master_data` table stores all compliance checklist question definitions. Na
 |---|---|
 | `EDC_RATE_CONFIG` / `EDC_RATE_CONFIG_DETAIL` | EDC (card terminal) rate configuration templates |
 | `QC_RATE_CONFIG` / `QC_RATE_CONFIG_DETAIL` | QR Credit rate configuration templates |
+
+---
+
+## master_data Foreign Key Patterns
+
+`master_data` is joined two different ways depending on the source column. **Picking the wrong key returns no match silently** (no FK constraints).
+
+### Pattern 1 — by `id` (integer FK columns on merchant_info / merchant_personal_info)
+
+Used when the source column stores the `master_data.id` value directly. Most `*_id` columns on `merchant_info` follow this pattern.
+
+```sql
+LEFT JOIN master_data md_bank
+  ON md_bank.id::text = mi.bank_id::text
+ AND md_bank.key1 = 'BANK'
+```
+
+Cast both sides to `::text` — the FK columns are a mix of `bigint`, `varchar`, and even non-numeric varchar in a few cases, and `master_data.id` is `bigint`. A naked `=` raises `operator does not exist: text = bigint`.
+
+Confirmed columns that use this pattern:
+
+| Column (source) | `master_data.key1` |
+|---|---|
+| `merchant_info.bank_id` | `BANK` |
+| `merchant_info.bank_account_type_id` | `BANK_ACCOUNT_TYPE` |
+| `merchant_info.ip_host_country` | `COUNTRY` |
+| `merchant_info.business_category_id` | `BUSINESS_CATEGORY` |
+| `merchant_info.business_group_id` | `BUSINESS_GROUP` |
+| `merchant_info.company_type_id` | `COMPANY_TYPE` |
+| `merchant_personal_info.title_name_id` | `TITLE_NAME` |
+| `merchant_personal_info.job_id` | `JOB` |
+
+### Pattern 2 — by `key2` (3-digit bank/payment codes)
+
+Used when the source column holds the external code (e.g. Bank of Thailand 3-digit bank code `'014'` = SCB), not the master_data row id.
+
+```sql
+LEFT JOIN master_data md
+  ON md.key1 = 'BANK'
+ AND md.key2 = ptr.from_bank
+ AND md.enabled = TRUE
+```
+
+Confirmed columns that use this pattern:
+
+| Column | `master_data.key1` |
+|---|---|
+| `payment_transaction_response.from_bank` | `BANK` |
+| `transfer_transaction.bank_code` | `BANK` |
+| `gateway_channel.bank_code` | `BANK` |
+
+`BANK` is the only category that uses Pattern 2 in practice — it has both an `id` and a meaningful `key2` (the BOT code). Most other categories have `key2 = NULL` and can only be joined by `id`.
+
+### Display column
+
+Use `master_data.name_en` for English UI, `name_th` for Thai. Both are populated for all reference data (`BANK`, `COUNTRY`, `TITLE_NAME`, etc.).
+
+---
+
+## merchant_info — column quirks
+
+Captured while building `/application-support/merchant-lookup/[merchant_no]`:
+
+- **`merchant_info.email` does not exist.** The "Email" field shown in the prod backoffice is sourced from `users.username` for that merchant (the login email). The prod UI also has a second EMAIL field that's almost always blank — its underlying column is unidentified.
+- **`merchant_info.business_type` (varchar) is effectively dead** — typical values are `'0'` or empty. The prod UI's "Business Type" label actually displays `business_category_id` looked up via `master_data` (key1=`BUSINESS_CATEGORY`); the column named `business_type` is not used.
+- **`merchant_info.company_telephone` is for the corporate entity.** Individual-merchant phone numbers live on `merchant_personal_info.telephone`. The phone-duplicate finder COALESCEs both.
+- **`merchant_info.qr_gwc_id` → `gateway_channel.id`.** The display "CIMB(010555915430960)" is built from `gateway_info.name_en` + `gateway_channel.merchant_id` (the gateway-side ID — confusingly named, it is NOT a FK into `merchant_info`).
+- **Approval dates appear shifted by 1 day** from what's shown in prod (e.g. raw `2025-01-19 17:00:00` displays as `2025-01-20 00:00:00`). These columns are stored UTC despite the `timestamp without time zone` type — the `db.ts` type-parser override returns the raw text and the consumer must add +7h for Bangkok wall-clock if matching prod display.
+
+## merchant_personal_info — 1:N per merchant
+
+| Column | Meaning |
+|---|---|
+| `merchant_id` | FK → merchant_info.id |
+| `title_name_id` | → master_data.id (key1='TITLE_NAME'); e.g. id=36 → "Mr." / "นาย" |
+| `job_id` | → master_data.id (key1='JOB') |
+| `income_type_id` | → master_data (key1='COMPANY_INCOME_TYPE' or 'INDIVIDUAL_INCOME_TYPE') |
+| `income_range_id` | → master_data (key1='COMPANY_INCOME_RANGE' or 'INDIVIDUAL_INCOME_RANGE') |
+| `property_id` / `property_value_id` | → master_data (key1='PROPERTY' / 'PROPERTY_VALUE') |
+| `is_authorize` / `is_director` / `is_contact_person` / `is_relation_ship` / `is_political` / `is_witness` | role flags |
+| `full_name_th` / `full_name_en` / `citizen_id` / `national` / `dob` / `expire_id_card` | identity |
+| `contact_address` / `telephone` | contact |
+
+Companies (`merchant_info.person_type='C'`) can have multiple rows (directors, authorized signers, witnesses); individuals (`'I'`) typically have one. When you only want a single representative row, `ORDER BY id ASC LIMIT 1` or filter on `is_authorize=true`.
+
+## Duplicate-detection patterns
+
+Used by `/operation/duplicate-tax-id` and `/operation/duplicate-phone`:
+
+- **Tax ID** = `COALESCE(NULLIF(TRIM(merchant_info.company_tax_id), ''), NULLIF(TRIM(merchant_personal_info.citizen_id), ''))` — companies use the corporate tax ID, individuals use the citizen ID. Both are 13-digit Thai numbers; the first digit identifies the entity type (0 = juristic, 1–8 = individual).
+- **Phone** = `COALESCE(NULLIF(TRIM(merchant_info.company_telephone), ''), NULLIF(TRIM(merchant_personal_info.telephone), ''))`.
+- For per-merchant personal info, use `LEFT JOIN LATERAL (... ORDER BY id ASC LIMIT 1)` to avoid duplicating rows for company merchants with multiple persons.
+
+## merchant_setting_rate — rate history table
+
+| Column | Notes |
+|---|---|
+| `merchant_id` | FK → merchant_info.id (1:N) |
+| `payment_type` | `'Q'` = QR Cash (confirmed). Other inferred values: `'QC'` QR Credit, `'CO'` Credit Card Online, `'CF'` Credit Card Offline, `'T'` Transfer |
+| `start_date` / `end_date` | Validity window |
+| `rate_percent` / `rate_per_time` | QR rate + per-transaction min |
+| `rate_transfer_percent` / `rate_transfer_per_time` | Transfer rate |
+| `rate_withdraw_to_merchant_percent/per_time` | Withdraw to own bank |
+| `rate_withdraw_to_other_percent/per_time` | Withdraw to other bank |
+| `is_default` | Currently active row |
+
+`merchant_rate` (1:1 with merchant_info) holds the *effective current* rates; `merchant_setting_rate` is the historical audit table that drives changes.
 
 ---
 
