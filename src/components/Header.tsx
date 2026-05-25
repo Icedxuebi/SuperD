@@ -21,6 +21,8 @@ const riskManagement: NavItem[] = [
   { label: "Police Case Query", href: "/risk-management/police-case" },
   { label: "Top Merchant Transaction", href: "/risk-management/top-100-merchants" },
   { label: "No Transaction 90 / 120", href: "/risk-management/no-transaction" },
+  { label: "Spender History", href: "/risk-management/spender-history" },
+  { label: "Top Spender", href: "/risk-management/top-spender" },
   { label: "Blacklist" },
   { label: "Fraud Monitoring" },
 ];
