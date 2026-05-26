@@ -37,15 +37,21 @@ If a file is missing, the DOCX still generates — just without that person's si
 
 ## Features
 
-| Area | Route | What |
-| --- | --- | --- |
-| Risk Management | `/risk-management/police-case` | MID + date range → payments + withdrawals table → Excel export |
-| Risk Management | `/risk-management/top-100-merchants` | Top Merchant Transaction dashboard (by date / week / month / multi-day stats) |
-| Application Support | `/application-support/merchant-lookup` | Searchable, paginated `merchant_info` browser + per-merchant detail page (mirrors staff.anypay.asia backoffice) |
-| Application Support | `/application-support/merchant-status-by-ae` | Active vs inactive merchants per AE partner |
-| Application Support | `/application-support/generate-top5-report` | Generates the TOP 5 Daily Report `.docx` |
-| Operation | `/operation/duplicate-tax-id` | Merchants sharing a Tax / Citizen ID with another merchant (search + Excel export) |
-| Operation | `/operation/duplicate-phone` | Merchants sharing a phone number with another merchant (search + Excel export) |
+| Area | Nav label | Route | What |
+| --- | --- | --- | --- |
+| Application Support | Merchant Lookup | `/application-support/merchant-lookup` | Searchable, paginated `merchant_info` browser + per-merchant detail page (mirrors staff.anypay.asia backoffice) |
+| Application Support | Merchant Status by AE | `/application-support/merchant-status-by-ae` | Active vs inactive merchants per AE partner |
+| Application Support | Payment Status | `/application-support/payment-status` | Bulk-paste Ref1 (`merchant_invoice`) / Ref2 (`merchant_reference_no`) → payment status + amounts, with success/failed summary and Excel export |
+| Application Support | Transfer Status | `/application-support/transfer-status` | Same bulk-ref lookup as Payment Status, for withdrawal / payout transfer status |
+| Application Support | Generate Top 5 Report | `/application-support/generate-top5-report` | Generates the TOP 5 Daily Report `.docx` |
+| Application Support | Ticket Dashboard | `/application-support/ticket-dashboard` | Upload a support-ticket CSV → charts for issue mix, created-vs-closed by team member, resolution time, and tickets per partner (client-side only, no DB) |
+| Operation | Check Duplicate Tax ID | `/operation/duplicate-tax-id` | Merchants sharing a Tax / Citizen ID with another merchant (search + Excel export) |
+| Operation | Check Duplicate Phone Number | `/operation/duplicate-phone` | Merchants sharing a phone number with another merchant (search + Excel export) |
+| Risk Management | Police Case Query | `/risk-management/police-case` | MID + date range → payments + withdrawals table → Excel export |
+| Risk Management | Top Merchant Transaction | `/risk-management/top-100-merchants` | Top Merchant Transaction dashboard (by date / week / month / multi-day stats) |
+| Risk Management | No Transaction 90 / 120 | `/risk-management/no-transaction` | Live merchants (`close_date` unset) with no successful payment in a 75 / 90 / 120-day window; flags "never transacted"; Excel export |
+| Risk Management | Spender History | `/risk-management/spender-history` | Look up a payer's bank account → every Anypay merchant it has paid (successful only), aggregated per merchant with totals and Excel export |
+| Risk Management | Top Spender | `/risk-management/top-spender` | Top spenders (by bank account) for a selected month with totals, top-10 chart, concentration share, and Excel export |
 
 ## Where to look
 
