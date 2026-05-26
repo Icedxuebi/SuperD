@@ -80,7 +80,7 @@ function lastTransactionLabel(date: string | null | undefined): string {
 }
 
 export default function NoTransactionPage() {
-  const [days, setDays] = useState<Days>(90);
+  const [days, setDays] = useState<Days>(75);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

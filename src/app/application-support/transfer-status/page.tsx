@@ -10,8 +10,8 @@ type Row = {
   "Ref1": string | null;
   "Ref2": string | null;
   "Amount": string | number | null;
-  "Payment Status": string | null;
-  "Payment Date": string | null;
+  "Transfer Status": string | null;
+  "Transfer Date": string | null;
   "MID": string | null;
   "Merchant Name": string | null;
 };
@@ -32,8 +32,8 @@ type SortKey =
   | "Ref1"
   | "Ref2"
   | "Amount"
-  | "Payment Status"
-  | "Payment Date"
+  | "Transfer Status"
+  | "Transfer Date"
   | "MID"
   | "Merchant Name";
 
@@ -48,8 +48,8 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean; mono?: boolean 
   { key: "Ref1", label: "Ref 1", mono: true },
   { key: "Ref2", label: "Ref 2", mono: true },
   { key: "Amount", label: "Amount", numeric: true },
-  { key: "Payment Status", label: "Status" },
-  { key: "Payment Date", label: "Payment Date", mono: true },
+  { key: "Transfer Status", label: "Status" },
+  { key: "Transfer Date", label: "Transfer Date", mono: true },
 ];
 
 function fmtDate(value: string | null | undefined) {
@@ -72,6 +72,7 @@ function StatusPill({ status }: { status: string | null }) {
   const s = status.toUpperCase();
   const map: Record<string, { bg: string; label: string }> = {
     S: { bg: "bg-emerald-100 text-emerald-700", label: "Success" },
+    E: { bg: "bg-red-100 text-red-700", label: "Failed" },
     F: { bg: "bg-red-100 text-red-700", label: "Failed" },
     P: { bg: "bg-amber-100 text-amber-700", label: "Pending" },
   };
@@ -86,7 +87,7 @@ function StatusPill({ status }: { status: string | null }) {
   );
 }
 
-export default function PaymentStatusPage() {
+export default function TransferStatusPage() {
   const [ref1, setRef1] = useState("");
   const [ref2, setRef2] = useState("");
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -94,16 +95,16 @@ export default function PaymentStatusPage() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [sortKey, setSortKey] = useState<SortKey>("Payment Date");
+  const [sortKey, setSortKey] = useState<SortKey>("Transfer Date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filter, setFilter] = useState("");
 
   const ref1Count = useMemo(
-    () => ref1.split(/\r?\n/).filter((s) => s.trim().length > 0).length,
+    () => ref1.split(/\r?\n/).filter((s) => s.trim().replace(/^"+|"+$/g, "").trim().length > 0).length,
     [ref1],
   );
   const ref2Count = useMemo(
-    () => ref2.split(/\r?\n/).filter((s) => s.trim().length > 0).length,
+    () => ref2.split(/\r?\n/).filter((s) => s.trim().replace(/^"+|"+$/g, "").trim().length > 0).length,
     [ref2],
   );
 
@@ -117,7 +118,7 @@ export default function PaymentStatusPage() {
     setError(null);
     setData(null);
     try {
-      const res = await fetch("/api/payment-status", {
+      const res = await fetch("/api/transfer-status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ref1, ref2 }),
@@ -146,7 +147,7 @@ export default function PaymentStatusPage() {
     setExporting(true);
     setError(null);
     try {
-      const res = await fetch("/api/payment-status", {
+      const res = await fetch("/api/transfer-status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ref1, ref2, full: true }),
@@ -160,9 +161,9 @@ export default function PaymentStatusPage() {
       }
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Payment Status");
+      XLSX.utils.book_append_sheet(wb, ws, "Transfer Status");
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-      XLSX.writeFile(wb, `PaymentStatus_${stamp}.xlsx`);
+      XLSX.writeFile(wb, `TransferStatus_${stamp}.xlsx`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Export failed");
     } finally {
@@ -175,7 +176,7 @@ export default function PaymentStatusPage() {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(k);
-      setSortDir(k === "Amount" || k === "Payment Date" || k === "Create Date" ? "desc" : "asc");
+      setSortDir(k === "Amount" || k === "Transfer Date" || k === "Create Date" ? "desc" : "asc");
     }
   }
   function arrow(k: SortKey) {
@@ -213,9 +214,9 @@ export default function PaymentStatusPage() {
     let other = 0;
     let amount = 0;
     for (const r of data.rows) {
-      const st = (r["Payment Status"] ?? "").toString().toUpperCase();
+      const st = (r["Transfer Status"] ?? "").toString().toUpperCase();
       if (st === "S") s += 1;
-      else if (st === "F") f += 1;
+      else if (st === "E" || st === "F") f += 1;
       else other += 1;
       const n = typeof r.Amount === "string" ? Number(r.Amount) : r.Amount;
       if (Number.isFinite(n)) amount += n as number;
@@ -228,9 +229,9 @@ export default function PaymentStatusPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">Payment Status</h1>
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">Transfer Status</h1>
         <p className="text-slate-600">
-          Check Payment status
+          Check withdrawal / payout transfer status
         </p>
       </div>
 
@@ -435,10 +436,10 @@ export default function PaymentStatusPage() {
                         {fmtTHB(r["Amount"])}
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap">
-                        <StatusPill status={r["Payment Status"]} />
+                        <StatusPill status={r["Transfer Status"]} />
                       </td>
                       <td className="px-4 py-2 font-mono text-xs whitespace-nowrap">
-                        {fmtDate(r["Payment Date"])}
+                        {fmtDate(r["Transfer Date"])}
                       </td>
                     </tr>
                   ))}

@@ -6,15 +6,14 @@ const applicationSupport: NavItem[] = [
   { label: "Merchant Lookup", href: "/application-support/merchant-lookup" },
   { label: "Merchant Status by AE", href: "/application-support/merchant-status-by-ae" },
   { label: "Payment Status", href: "/application-support/payment-status" },
+  { label: "Transfer Status", href: "/application-support/transfer-status" },
   { label: "Generate Top 5 Report", href: "/application-support/generate-top5-report" },
-  { label: "User Management" },
+  { label: "Ticket Dashboard", href: "/application-support/ticket-dashboard" },
 ];
 
 const operation: NavItem[] = [
   { label: "Check Duplicate Tax ID", href: "/operation/duplicate-tax-id" },
   { label: "Check Duplicate Phone Number", href: "/operation/duplicate-phone" },
-  { label: "Onboarding Queue" },
-  { label: "Reconciliation" },
 ];
 
 const riskManagement: NavItem[] = [
@@ -23,14 +22,9 @@ const riskManagement: NavItem[] = [
   { label: "No Transaction 90 / 120", href: "/risk-management/no-transaction" },
   { label: "Spender History", href: "/risk-management/spender-history" },
   { label: "Top Spender", href: "/risk-management/top-spender" },
-  { label: "Blacklist" },
-  { label: "Fraud Monitoring" },
 ];
 
-const finance: NavItem[] = [
-  { label: "Settlement Reports" },
-  { label: "Commission" },
-];
+const finance: NavItem[] = [];
 
 export function Header() {
   return (

@@ -11,36 +11,36 @@ const REF_INPUT_LIMIT = 10000;
 
 const SQL = `
 SELECT
-    pt.id::text                            AS "Order ID",
-    pt.create_by                           AS "Create By",
-    pt.create_date                         AS "Create Date",
-    pt.merchant_invoice                    AS "Ref1",
-    pt.merchant_reference_no               AS "Ref2",
-    pt.amount                              AS "Amount",
-    pt.status                              AS "Payment Status",
-    pt.payment_date                        AS "Payment Date",
+    tt.id::text                            AS "Order ID",
+    tt.create_by                           AS "Create By",
+    tt.create_date                         AS "Create Date",
+    tt.merchant_invoice                    AS "Ref1",
+    tt.merchant_reference_no               AS "Ref2",
+    tt.amount                              AS "Amount",
+    tt.status                              AS "Transfer Status",
+    tt.transfer_date                       AS "Transfer Date",
     mi.merchant_no                         AS "MID",
     mi.merchant_name_en                    AS "Merchant Name"
-FROM payment_transaction pt
-LEFT JOIN merchant_info mi ON mi.id = pt.merchant_id
-WHERE pt.merchant_invoice      = ANY($1::text[])
-   OR pt.merchant_reference_no = ANY($2::text[])
-ORDER BY pt.payment_date DESC NULLS LAST, pt.create_date DESC NULLS LAST
+FROM transfer_transaction tt
+LEFT JOIN merchant_info mi ON mi.id = tt.merchant_id
+WHERE tt.merchant_invoice      = ANY($1::text[])
+   OR tt.merchant_reference_no = ANY($2::text[])
+ORDER BY tt.transfer_date DESC NULLS LAST, tt.create_date DESC NULLS LAST
 LIMIT $3;
 `;
 
-// Export variant — every column on the transaction (SELECT *) plus the
+// Export variant — every column on the transfer (SELECT *) plus the
 // merchant identifiers, for the "Export to Excel" button.
 const EXPORT_SQL = `
 SELECT
-    pt.*,
+    tt.*,
     mi.merchant_no                         AS "MID",
     mi.merchant_name_en                    AS "Merchant Name"
-FROM payment_transaction pt
-LEFT JOIN merchant_info mi ON mi.id = pt.merchant_id
-WHERE pt.merchant_invoice      = ANY($1::text[])
-   OR pt.merchant_reference_no = ANY($2::text[])
-ORDER BY pt.payment_date DESC NULLS LAST, pt.create_date DESC NULLS LAST
+FROM transfer_transaction tt
+LEFT JOIN merchant_info mi ON mi.id = tt.merchant_id
+WHERE tt.merchant_invoice      = ANY($1::text[])
+   OR tt.merchant_reference_no = ANY($2::text[])
+ORDER BY tt.transfer_date DESC NULLS LAST, tt.create_date DESC NULLS LAST
 LIMIT $3;
 `;
 
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Query failed";
-    console.error("[/api/payment-status]", err);
+    console.error("[/api/transfer-status]", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

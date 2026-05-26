@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Pie,
   PieChart,
@@ -16,7 +17,7 @@ import {
 } from "recharts";
 
 const COLOR_ACTIVE = "#059669"; // emerald-600
-const COLOR_INACTIVE = "#cbd5e1"; // slate-300
+const COLOR_INACTIVE = "#A4262C"; // brand red
 
 type PartnerRow = {
   partner_no: string;
@@ -118,6 +119,22 @@ export default function MerchantStatusByAePage() {
   const topAe = useMemo(() => {
     if (!data || data.partners.length === 0) return null;
     return [...data.partners].sort((a, b) => b.active - a.active)[0];
+  }, [data]);
+
+  const top3Active = useMemo(() => {
+    if (!data) return [];
+    return [...data.partners]
+      .filter((p) => p.active > 0)
+      .sort((a, b) => b.active - a.active)
+      .slice(0, 3);
+  }, [data]);
+
+  const top3Inactive = useMemo(() => {
+    if (!data) return [];
+    return [...data.partners]
+      .filter((p) => p.inactive > 0)
+      .sort((a, b) => b.inactive - a.inactive)
+      .slice(0, 5);
   }, [data]);
 
   const activeRate =
@@ -283,57 +300,76 @@ export default function MerchantStatusByAePage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-xl p-5 shadow-card">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="inline-block w-1 h-5 rounded-full bg-brand-600" />
-                <h3 className="text-lg font-semibold text-slate-800">
-                  Active vs Inactive per AE
-                  <span className="text-sm font-normal text-slate-500 ml-2">
-                    {topN === 9999
-                      ? `${chartData.length} partners`
-                      : `Top ${Math.min(topN, chartData.length)} of ${data.partners.length}`}
-                  </span>
-                </h3>
-              </div>
-              <div style={{ width: "100%", height: Math.max(280, chartData.length * 30 + 60) }}>
-                <ResponsiveContainer>
-                  <BarChart
-                    data={chartData}
-                    layout="vertical"
-                    margin={{ top: 5, right: 40, left: 20, bottom: 5 }}
-                    barCategoryGap={6}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                    <XAxis type="number" stroke="#64748b" fontSize={12} />
-                    <YAxis
-                      type="category"
-                      dataKey="partner_no"
-                      stroke="#64748b"
-                      fontSize={11}
-                      width={90}
-                      tick={{ textAnchor: "end" }}
-                    />
-                    <Tooltip
-                      contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0" }}
-                      formatter={(value: number, name) => [
-                        value.toLocaleString(),
-                        name === "active" ? "Active" : "Inactive",
-                      ]}
-                      labelStyle={{ fontWeight: 600 }}
-                    />
-                    <Legend
-                      wrapperStyle={{ fontSize: 12 }}
-                      iconType="circle"
-                      formatter={(v) => (v === "active" ? "Active" : "Inactive")}
-                    />
-                    <Bar dataKey="active" stackId="a" fill={COLOR_ACTIVE} radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="inactive" stackId="a" fill={COLOR_INACTIVE} radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+          <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-card">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="inline-block w-1 h-5 rounded-full bg-brand-600" />
+              <h3 className="text-lg font-semibold text-slate-800">
+                Active vs Inactive per AE
+                <span className="text-sm font-normal text-slate-500 ml-2">
+                  {topN === 9999
+                    ? `${chartData.length} partners`
+                    : `Top ${Math.min(topN, chartData.length)} of ${data.partners.length}`}
+                </span>
+              </h3>
             </div>
+            <div style={{ width: "100%", height: Math.max(280, chartData.length * 30 + 60) }}>
+              <ResponsiveContainer>
+                <BarChart
+                  data={chartData}
+                  layout="vertical"
+                  margin={{ top: 5, right: 96, left: 20, bottom: 5 }}
+                  barCategoryGap={6}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" fontSize={12} />
+                  <YAxis
+                    type="category"
+                    dataKey="partner_no"
+                    stroke="#64748b"
+                    fontSize={11}
+                    width={90}
+                    tick={{ textAnchor: "end" }}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0" }}
+                    formatter={(value: number, name) => [
+                      value.toLocaleString(),
+                      name === "active" ? "Active" : "Inactive",
+                    ]}
+                    labelStyle={{ fontWeight: 600 }}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 12 }}
+                    iconType="circle"
+                    formatter={(v) => (v === "active" ? "Active" : "Inactive")}
+                  />
+                  <Bar dataKey="active" stackId="a" fill={COLOR_ACTIVE} radius={[0, 0, 0, 0]}>
+                    <LabelList
+                      dataKey="active"
+                      position="insideRight"
+                      fill="#ffffff"
+                      fontSize={10}
+                      fontWeight={600}
+                      formatter={(v: number) => (v > 0 ? v.toLocaleString() : "")}
+                    />
+                  </Bar>
+                  <Bar dataKey="inactive" stackId="a" fill="#A4262C" radius={[0, 4, 4, 0]}>
+                    <LabelList
+                      dataKey="inactive"
+                      position="center"
+                      fill="#ffffff"
+                      fontSize={10}
+                      fontWeight={600}
+                      formatter={(v: number) => (v > 0 ? v.toLocaleString() : "")}
+                    />
+                    <LabelList dataKey="total" content={TotalLabel} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-card">
               <div className="flex items-center gap-2 mb-4">
                 <span className="inline-block w-1 h-5 rounded-full bg-accent-500" />
@@ -373,6 +409,21 @@ export default function MerchantStatusByAePage() {
                 <LegendDot color={COLOR_ACTIVE} label="Active" value={data.totals.active} />
                 <LegendDot color={COLOR_INACTIVE} label="Inactive" value={data.totals.inactive} />
               </div>
+            </div>
+
+            <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-xl p-5 shadow-card space-y-6">
+              <TopAeList
+                title="Top Active"
+                rows={top3Active}
+                metric="active"
+                barColor={COLOR_ACTIVE}
+              />
+              <TopAeList
+                title="Top Inactive"
+                rows={top3Inactive}
+                metric="inactive"
+                barColor={COLOR_INACTIVE}
+              />
             </div>
           </div>
 
@@ -461,6 +512,92 @@ export default function MerchantStatusByAePage() {
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// Renders the stacked-bar total as a single, non-wrapping SVG <text> to the
+// right of the bar. (recharts' default label Text wraps words to fit the bar
+// width, which splits "Total = 35" across three lines on thin segments.)
+function TotalLabel(props: {
+  x?: number | string;
+  y?: number | string;
+  width?: number | string;
+  height?: number | string;
+  value?: number | string;
+}) {
+  const x = Number(props.x ?? 0);
+  const y = Number(props.y ?? 0);
+  const width = Number(props.width ?? 0);
+  const height = Number(props.height ?? 0);
+  const total = Number(props.value ?? 0);
+  return (
+    <text
+      x={x + width + 8}
+      y={y + height / 2}
+      fill="#475569"
+      fontSize={11}
+      fontWeight={600}
+      textAnchor="start"
+      dominantBaseline="central"
+    >
+      {`Total = ${total.toLocaleString()}`}
+    </text>
+  );
+}
+
+function TopAeList({
+  title,
+  rows,
+  metric,
+  barColor,
+}: {
+  title: string;
+  rows: PartnerRow[];
+  metric: "active" | "inactive";
+  barColor: string;
+}) {
+  const max = rows.reduce((m, p) => Math.max(m, p[metric]), 0);
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="inline-block w-1 h-5 rounded-full bg-brand-600" />
+        <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
+      </div>
+      {rows.length === 0 ? (
+        <div className="text-center py-6 text-slate-500 text-sm">
+          No {metric} merchants for any AE.
+        </div>
+      ) : (
+        <ol className="space-y-2">
+          {rows.map((p, i) => {
+            const value = p[metric];
+            const width = max > 0 ? (value / max) * 100 : 0;
+            return (
+              <li key={p.partner_no} className="flex items-center gap-3">
+                <span className="flex-none w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold flex items-center justify-center tabular-nums">
+                  {i + 1}
+                </span>
+                <span className="flex-none w-20 font-mono text-xs font-medium text-slate-800">
+                  {p.partner_no}
+                </span>
+                <div className="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${width}%`, backgroundColor: barColor }}
+                  />
+                </div>
+                <span className="flex-none w-16 text-right font-mono text-sm font-semibold tabular-nums text-slate-800">
+                  {value.toLocaleString()}
+                </span>
+                <span className="flex-none w-14 text-right font-mono text-xs tabular-nums text-slate-400">
+                  {formatPct(p.total > 0 ? value / p.total : 0)}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       )}
     </div>
   );
