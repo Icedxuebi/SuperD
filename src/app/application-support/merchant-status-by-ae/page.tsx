@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import {
   Bar,
   BarChart,
@@ -139,6 +140,37 @@ export default function MerchantStatusByAePage() {
 
   const activeRate =
     data && data.totals.total > 0 ? data.totals.active / data.totals.total : 0;
+
+  function exportExcel() {
+    if (sortedPartners.length === 0) return;
+    const rows = sortedPartners.map((p) => ({
+      Partner: p.partner_no,
+      Active: p.active,
+      Inactive: p.inactive,
+      Total: p.total,
+      "Active %": p.total > 0 ? p.active / p.total : 0,
+    }));
+    if (data) {
+      rows.push({
+        Partner: "Total",
+        Active: data.totals.active,
+        Inactive: data.totals.inactive,
+        Total: data.totals.total,
+        "Active %": activeRate,
+      });
+    }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Format the Active % column as a percentage.
+    const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
+    for (let r = range.s.r + 1; r <= range.e.r; r++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c: 4 })];
+      if (cell) cell.z = "0.0%";
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Breakdown by AE");
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `MerchantStatusByAE_${stamp}.xlsx`);
+  }
 
   return (
     <div className="space-y-6">
@@ -438,6 +470,32 @@ export default function MerchantStatusByAePage() {
                   </span>
                 </h3>
               </div>
+              <button
+                type="button"
+                onClick={exportExcel}
+                disabled={sortedPartners.length === 0}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors shadow-sm"
+                title={
+                  sortedPartners.length === 0
+                    ? "No rows to export"
+                    : `Export ${sortedPartners.length.toLocaleString()} partner${sortedPartners.length === 1 ? "" : "s"}`
+                }
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <path d="M7 10l5 5 5-5" />
+                  <path d="M12 15V3" />
+                </svg>
+                Export Excel
+              </button>
             </div>
             <div className="overflow-x-auto max-h-[600px]">
               <table className="w-full text-sm">

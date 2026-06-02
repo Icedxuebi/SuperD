@@ -44,7 +44,6 @@ export async function GET() {
       { active: 0, inactive: 0 },
     );
 
-    // …but only expose rows with a real partner_no to the chart + table.
     const partners = result.rows
       .filter((r) => r.partner_no !== null)
       .map((r) => ({

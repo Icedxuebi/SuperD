@@ -155,7 +155,7 @@ export default function Top100MerchantsPage() {
   if (periods.length === 0 && !loading) {
     return (
       <div className="max-w-2xl mx-auto text-center py-16">
-        <h1 className="text-3xl font-bold mb-3">No payment data in the last 90 days</h1>
+        <h1 className="text-3xl font-bold mb-3">No payment data this month or last month</h1>
         <p className="text-slate-600">
           The dashboard pulls from <code>payment_transaction</code> directly — there are no
           recent rows to summarise.

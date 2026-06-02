@@ -5,6 +5,7 @@ import { NavDropdown, type NavItem } from "./NavDropdown";
 const applicationSupport: NavItem[] = [
   { label: "Merchant Lookup", href: "/application-support/merchant-lookup" },
   { label: "Merchant Status by AE", href: "/application-support/merchant-status-by-ae" },
+  { label: "Locked Accounts", href: "/application-support/locked-accounts" },
   { label: "Payment Status", href: "/application-support/payment-status" },
   { label: "Transfer Status", href: "/application-support/transfer-status" },
   { label: "Generate Top 5 Report", href: "/application-support/generate-top5-report" },
@@ -14,6 +15,7 @@ const applicationSupport: NavItem[] = [
 const operation: NavItem[] = [
   { label: "Check Duplicate Tax ID", href: "/operation/duplicate-tax-id" },
   { label: "Check Duplicate Phone Number", href: "/operation/duplicate-phone" },
+  { label: "Onboarding Funnel", href: "/operation/onboarding-funnel" },
 ];
 
 const riskManagement: NavItem[] = [
@@ -22,6 +24,10 @@ const riskManagement: NavItem[] = [
   { label: "No Transaction 90 / 120", href: "/risk-management/no-transaction" },
   { label: "Spender History", href: "/risk-management/spender-history" },
   { label: "Top Spender", href: "/risk-management/top-spender" },
+  { label: "Fraud Monitoring Feed", href: "/risk-management/fraud-monitoring" },
+  { label: "Blacklist Hit Report", href: "/risk-management/blacklist-hits" },
+  { label: "KYC / CDD Period Review", href: "/risk-management/kyc-cdd-review" },
+  { label: "Partner & Merchant Risk", href: "/risk-management/partner-merchant-risk" },
 ];
 
 const finance: NavItem[] = [];

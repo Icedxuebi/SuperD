@@ -110,8 +110,8 @@ Core payment record. One row per payment initiated.
 | fee | numeric | Platform fee charged |
 | fee_type | varchar | Fee calculation method |
 | cal_rate | double | Calculated rate |
-| pay_type | varchar | e.g. QR, card |
-| payment_type | varchar | Finer classification |
+| pay_type | varchar | Effectively single-valued — only `'F'` observed across all 59.2M rows (catalogued 2026-06-02). Docs originally said "e.g. QR, card" but production data does not reflect that. |
+| payment_type | varchar | Two values observed: `'Q'` (~all rows) and `'QC'` (32 rows). Catalogued 2026-06-02. |
 | currency / currency_code | varchar | |
 | status | varchar | Transaction status |
 | ref_no | varchar | Internal reference |
@@ -661,6 +661,6 @@ Used by `/operation/duplicate-tax-id` and `/operation/duplicate-phone`:
 ## Still To Learn
 
 - [ ] gateway_info rows (only 4 — which acquirers/banks?)
-- [ ] Distinct values of `payment_transaction.status`, `pay_type`, `payment_type`
+- [ ] Distinct values of `payment_transaction.status` (pay_type / payment_type catalogued 2026-06-02 — see column table above)
 - [ ] Distinct values of `transfer_transaction.status`, `type`, `payment_type`
 - [ ] Webhook `type` + `status` distribution
