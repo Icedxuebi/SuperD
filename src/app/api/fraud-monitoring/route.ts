@@ -166,14 +166,14 @@ export async function GET(req: Request) {
       SELECT
         mi.id                       AS merchant_id,
         mi.merchant_no,
-        COALESCE(mi.company_name_en, mi.company_name_th) AS company,
+        mi.merchant_name_en         AS merchant_name,
         pi.partner_no,
         COUNT(*)::int               AS alerts
       FROM transaction_fraud_monitoring tfm
       ${joins}
       ${whereWindow}
         ${whereWindow ? "AND" : "WHERE"} mi.id IS NOT NULL
-      GROUP BY mi.id, mi.merchant_no, mi.company_name_en, mi.company_name_th, pi.partner_no
+      GROUP BY mi.id, mi.merchant_no, mi.merchant_name_en, pi.partner_no
       ORDER BY alerts DESC
       LIMIT 25
     `;
@@ -255,7 +255,7 @@ export async function GET(req: Request) {
       topMerchants: topMerchantsRes.rows.map((r) => ({
         merchant_id: r.merchant_id ?? null,
         merchant_no: r.merchant_no ?? null,
-        company: r.company ?? null,
+        merchant_name: r.merchant_name ?? null,
         partner_no: r.partner_no ?? null,
         alerts: num(r.alerts),
       })),

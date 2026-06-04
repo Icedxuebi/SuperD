@@ -59,9 +59,13 @@ const STUCK_THRESHOLDS = [14, 30, 60, 90, 180];
 // Friendly state labels (the SQL state literal is what's in the DB).
 const STATE_LABEL: Record<string, string> = {
   REGISTER: "Registered",
+  WAITING_SANDBOX: "Waiting Sandbox",
+  COMPLETE_SANDBOX: "Sandbox Complete",
   PRE_APPROVE_DOCUMENT: "Pending Document",
   PRE_APPROVE_OPERATION: "Pending Operation",
+  PRE_APPROVE_OPERATION_MANAGER: "Pending Operation Mgr",
   PRE_APPROVE_SUPERVISOR: "Pending Supervisor",
+  PRE_APPROVE_RISK_MANAGER: "Pending Risk Mgr",
   PRE_BUSINESS_APPROVE: "Pending Business",
   BUSINESS_APPROVE: "Business Approved",
   APPROVE: "Approved (Live)",
@@ -69,18 +73,23 @@ const STATE_LABEL: Record<string, string> = {
   "(none)": "No State",
 };
 
-// Color per state — terminal states are emerald (approve) and slate (reject).
-// Everything in-pipeline rotates through the brand palette in funnel order.
+// Distinct color per state — each stage gets a visually separate hue so the
+// funnel chart is readable at a glance. Terminal states keep emerald (approve)
+// and slate (reject) so they stay recognisable elsewhere in the app.
 const STATE_COLOR: Record<string, string> = {
-  REGISTER: "#94a3b8",
-  PRE_APPROVE_DOCUMENT: "#fbbf24",
-  PRE_APPROVE_OPERATION: "#f97316",
-  PRE_APPROVE_SUPERVISOR: "#dc2626",
-  PRE_BUSINESS_APPROVE: "#A4262C",
-  BUSINESS_APPROVE: "#7c3aed",
-  APPROVE: "#059669",
-  REJECT: "#475569",
-  "(none)": "#cbd5e1",
+  REGISTER: "#3b82f6",                  // blue-500
+  WAITING_SANDBOX: "#06b6d4",           // cyan-500
+  COMPLETE_SANDBOX: "#84cc16",          // lime-500
+  PRE_APPROVE_DOCUMENT: "#14b8a6",      // teal-500
+  PRE_APPROVE_OPERATION: "#f59e0b",     // amber-500
+  PRE_APPROVE_OPERATION_MANAGER: "#ea580c", // orange-600
+  PRE_APPROVE_SUPERVISOR: "#ec4899",    // pink-500
+  PRE_APPROVE_RISK_MANAGER: "#a21caf",  // fuchsia-700
+  PRE_BUSINESS_APPROVE: "#A4262C",      // brand red
+  BUSINESS_APPROVE: "#7c3aed",          // violet-600
+  APPROVE: "#059669",                   // emerald-600
+  REJECT: "#475569",                    // slate-700
+  "(none)": "#cbd5e1",                  // slate-300
 };
 
 type SortKey = "merchant_no" | "age_days" | "state" | "partner_no";

@@ -41,7 +41,7 @@ type RuleRow = { rule: string; alerts: number };
 type TopMerchantRow = {
   merchant_id: string | null;
   merchant_no: string | null;
-  company: string | null;
+  merchant_name: string | null;
   partner_no: string | null;
   alerts: number;
 };
@@ -223,7 +223,7 @@ export default function FraudMonitoringPage() {
         XLSX.utils.json_to_sheet(
           data.topMerchants.map((r) => ({
             MID: r.merchant_no ?? "",
-            Company: r.company ?? "",
+            "Merchant Name": r.merchant_name ?? "",
             Partner: r.partner_no ?? "",
             Alerts: r.alerts,
           })),
@@ -490,7 +490,7 @@ export default function FraudMonitoringPage() {
                   {data.topMerchants.slice(0, 12).map((r, i) => {
                     const max = data.topMerchants[0]?.alerts ?? 1;
                     const width = max > 0 ? (r.alerts / max) * 100 : 0;
-                    const company = r.company || "—";
+                    const merchantName = r.merchant_name || "—";
                     return (
                       <li key={r.merchant_id ?? `m-${i}`} className="flex items-center gap-3">
                         <span className="flex-none w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold flex items-center justify-center tabular-nums">
@@ -508,8 +508,8 @@ export default function FraudMonitoringPage() {
                             "—"
                           )}
                         </span>
-                        <span className="flex-1 text-xs text-slate-600 truncate" title={company}>
-                          {company}
+                        <span className="flex-1 text-xs text-slate-600 truncate" title={merchantName}>
+                          {merchantName}
                         </span>
                         <div className="flex-none w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div className="h-full bg-brand-600" style={{ width: `${width}%` }} />
