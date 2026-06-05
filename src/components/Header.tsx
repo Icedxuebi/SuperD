@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { NavDropdown, type NavItem } from "./NavDropdown";
+import { LogoutButton } from "./LogoutButton";
+import { getCurrentUsername } from "@/lib/current-user";
 
 const applicationSupport: NavItem[] = [
   { label: "Merchant Lookup", href: "/application-support/merchant-lookup" },
@@ -32,7 +34,8 @@ const riskManagement: NavItem[] = [
 
 const finance: NavItem[] = [];
 
-export function Header() {
+export async function Header() {
+  const username = await getCurrentUsername();
   return (
     <header className="bg-white border-b border-slate-200/80 shadow-card sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-2">
@@ -53,6 +56,30 @@ export function Header() {
           <NavDropdown label="Risk Management" items={riskManagement} />
           <NavDropdown label="Finance" items={finance} />
         </nav>
+
+        <div className="ml-auto flex items-center gap-1">
+          <Link
+            href="/account"
+            className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors inline-flex items-center gap-1.5"
+            title="Account & profile"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21a8 8 0 0116 0" />
+            </svg>
+            <span className="max-w-[140px] truncate">{username ?? "Account"}</span>
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
     </header>
   );

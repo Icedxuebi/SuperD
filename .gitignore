@@ -25,3 +25,6 @@ Thumbs.db
 *.tsbuildinfo
 next-env.d.ts
 
+# auth
+auth/users.json
+
