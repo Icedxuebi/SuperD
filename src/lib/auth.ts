@@ -58,7 +58,8 @@ const DUMMY_SALT = Buffer.from("0".repeat(32), "hex");
 
 export async function verifyPassword(username: string, password: string): Promise<boolean> {
   const users = loadUsers();
-  const user = users.find((u) => u.username === username);
+  const target = username.toLowerCase();
+  const user = users.find((u) => u.username.toLowerCase() === target);
 
   if (!user) {
     // Burn the same scrypt cost so attackers can't enumerate usernames by timing.
@@ -108,7 +109,8 @@ export async function changePassword(
   // Re-read from disk (bypass cache) to avoid clobbering a concurrent edit.
   cache = null;
   const users = loadUsers();
-  const idx = users.findIndex((u) => u.username === username);
+  const target = username.toLowerCase();
+  const idx = users.findIndex((u) => u.username.toLowerCase() === target);
   if (idx === -1) return { ok: false, reason: "user-not-found" };
 
   const ok = await verifyPassword(username, currentPassword);
