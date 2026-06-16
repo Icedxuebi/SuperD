@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 
 export const metadata: Metadata = {
   title: "Super D — Anypay Internal Tools",
-  description: "Internal tools for Application Support, Operation, Risk Management and Finance.",
+  description: "Internal tools for Application Support, Operation, Risk Management and CFR.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

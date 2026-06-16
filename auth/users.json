@@ -1,0 +1,27 @@
+[
+  {
+    "username": "IcedXuebi",
+    "passwordHash": "scrypt$7b8408114adfef8e9fe5cde4cc7d63f2$cb83fa5a7bbd750340f1b4aba60feb965c9b639aa3ae2381294669f55678c4255ceafdcfffcd5077e3c27f6598e4bb31e8366b763747b38800df471f3ca08db4"
+  },
+  {
+    "username": "Operation",
+    "passwordHash": "scrypt$9eabbbb255e022c7255da037bf6e0358$e191b2156f8fd22a80eceff41173301b43b040335812dec50477e033a196cf3f8ccfde8826b9124ba33be867c46e58bd5057f2d93810904f794e8af4da0fcd17"
+  },
+  {
+    "username": "Support",
+    "passwordHash": "scrypt$9eabbbb255e022c7255da037bf6e0358$e191b2156f8fd22a80eceff41173301b43b040335812dec50477e033a196cf3f8ccfde8826b9124ba33be867c46e58bd5057f2d93810904f794e8af4da0fcd17"
+  },
+  {
+    "username": "Sasamon",
+    "passwordHash": "scrypt$9eabbbb255e022c7255da037bf6e0358$e191b2156f8fd22a80eceff41173301b43b040335812dec50477e033a196cf3f8ccfde8826b9124ba33be867c46e58bd5057f2d93810904f794e8af4da0fcd17"
+  },
+  {
+    "username": "risk",
+    "passwordHash": "scrypt$9eabbbb255e022c7255da037bf6e0358$e191b2156f8fd22a80eceff41173301b43b040335812dec50477e033a196cf3f8ccfde8826b9124ba33be867c46e58bd5057f2d93810904f794e8af4da0fcd17"
+  },
+  {
+    "username": "compliance",
+    "passwordHash": "scrypt$9eabbbb255e022c7255da037bf6e0358$e191b2156f8fd22a80eceff41173301b43b040335812dec50477e033a196cf3f8ccfde8826b9124ba33be867c46e58bd5057f2d93810904f794e8af4da0fcd17"
+  }
+
+]

@@ -17,13 +17,13 @@ import {
 type StateRow = {
   state: string;
   count: number;
-  no_register_date: number;
+  no_create_date: number;
   age_0_7: number;
   age_8_30: number;
   age_31_90: number;
   age_90_plus: number;
-  oldest_register_date: string | null;
-  newest_register_date: string | null;
+  oldest_create_date: string | null;
+  newest_create_date: string | null;
 };
 
 type StuckRow = {
@@ -35,9 +35,14 @@ type StuckRow = {
   merchant_name_th: string | null;
   person_type: string | null;
   state: string;
+  risk: string | null;
+  owner_name: string | null;
   partner_no: string | null;
+  create_date: string | null;
   register_date: string | null;
-  age_days: number;
+  age_days: number | null;
+  state_changed_at: string | null;
+  days_at_stage: number | null;
 };
 
 type ApiResponse = {
@@ -47,52 +52,88 @@ type ApiResponse = {
     inPipeline: number;
     approved: number;
     rejected: number;
-    stuck30: number;
-    stuck90: number;
   };
-  stuckDays: number;
   stuck: StuckRow[];
 };
 
-const STUCK_THRESHOLDS = [14, 30, 60, 90, 180];
-
-// Friendly state labels (the SQL state literal is what's in the DB).
+// Display names match the platform's "All States" list verbatim — the same
+// raw enum the rest of the org uses, so search/screenshots line up. Each
+// stage's meaning (in real funnel order):
+//   REGISTER                       — info entered (create_date)
+//   PRE_BUSINESS_APPROVE           — waiting for ops to action
+//   BUSINESS_APPROVE               — waiting for merchant to send more docs
+//   PRE_APPROVE_OPERATION          — KYC / KYM review
+//   PRE_APPROVE_OPERATION_MANAGER  — ops manager sign-off
+//   PRE_APPROVE_RISK               — risk team determines risk level
+//   PRE_APPROVE_RISK_MANAGER       — risk manager sign-off
+//   PRE_APPROVE_SUPERVISOR         — COO sign-off
+//   PRE_APPROVE_MANAGER            — CEO sign-off (only required when risk = H)
+//   PRE_APPROVE_DOCUMENT           — waiting for contract
+//   WAITING_SANDBOX                — waiting for merchant sandbox testing
+//   COMPLETE_SANDBOX               — sandbox done, ready to go live
 const STATE_LABEL: Record<string, string> = {
-  REGISTER: "Registered",
-  WAITING_SANDBOX: "Waiting Sandbox",
-  COMPLETE_SANDBOX: "Sandbox Complete",
-  PRE_APPROVE_DOCUMENT: "Pending Document",
-  PRE_APPROVE_OPERATION: "Pending Operation",
-  PRE_APPROVE_OPERATION_MANAGER: "Pending Operation Mgr",
-  PRE_APPROVE_SUPERVISOR: "Pending Supervisor",
-  PRE_APPROVE_RISK_MANAGER: "Pending Risk Mgr",
-  PRE_BUSINESS_APPROVE: "Pending Business",
-  BUSINESS_APPROVE: "Business Approved",
-  APPROVE: "Approved (Live)",
-  REJECT: "Rejected",
-  "(none)": "No State",
+  REGISTER: "REGISTER",
+  PRE_BUSINESS_APPROVE: "PRE_BUSINESS_APPROVE",
+  BUSINESS_APPROVE: "BUSINESS_APPROVE",
+  PRE_APPROVE_OPERATION: "PRE_APPROVE_OPERATION",
+  PRE_APPROVE_OPERATION_MANAGER: "PRE_APPROVE_OPERATION_MANAGER",
+  PRE_APPROVE_RISK: "PRE_APPROVE_RISK",
+  PRE_APPROVE_RISK_MANAGER: "PRE_APPROVE_RISK_MANAGER",
+  PRE_APPROVE_SUPERVISOR: "PRE_APPROVE_SUPERVISOR",
+  PRE_APPROVE_MANAGER: "PRE_APPROVE_MANAGER",
+  PRE_APPROVE_DOCUMENT: "PRE_APPROVE_DOCUMENT",
+  WAITING_SANDBOX: "WAITING_SANDBOX",
+  COMPLETE_SANDBOX: "COMPLETE_SANDBOX",
+  APPROVE: "APPROVE",
+  REJECT: "REJECT",
+};
+
+// Plain-English meaning per state — surfaced on hover everywhere the raw
+// enum is rendered so analysts don't have to memorise the FSM.
+const STATE_DESCRIPTION: Record<string, string> = {
+  REGISTER: "Applicant entered info — create_date is set.",
+  PRE_BUSINESS_APPROVE: "Waiting for ops to action.",
+  BUSINESS_APPROVE: "Waiting for merchant to send more document info.",
+  PRE_APPROVE_OPERATION: "KYC / KYM review by ops.",
+  PRE_APPROVE_OPERATION_MANAGER: "Ops manager sign-off.",
+  PRE_APPROVE_RISK: "Risk team determines risk level.",
+  PRE_APPROVE_RISK_MANAGER: "Risk manager sign-off.",
+  PRE_APPROVE_SUPERVISOR: "COO sign-off.",
+  PRE_APPROVE_MANAGER: "CEO sign-off — only required when risk = H.",
+  PRE_APPROVE_DOCUMENT: "Waiting for contract. Stage age counts from CEO+COO sign-off (risk = H) or COO sign-off (risk = M / L).",
+  WAITING_SANDBOX: "Waiting for merchant sandbox testing.",
+  COMPLETE_SANDBOX: "Sandbox done, ready to go live.",
+  APPROVE: "Approved — live merchant.",
+  REJECT: "Rejected — terminal.",
 };
 
 // Distinct color per state — each stage gets a visually separate hue so the
 // funnel chart is readable at a glance. Terminal states keep emerald (approve)
 // and slate (reject) so they stay recognisable elsewhere in the app.
 const STATE_COLOR: Record<string, string> = {
-  REGISTER: "#3b82f6",                  // blue-500
-  WAITING_SANDBOX: "#06b6d4",           // cyan-500
-  COMPLETE_SANDBOX: "#84cc16",          // lime-500
-  PRE_APPROVE_DOCUMENT: "#14b8a6",      // teal-500
-  PRE_APPROVE_OPERATION: "#f59e0b",     // amber-500
-  PRE_APPROVE_OPERATION_MANAGER: "#ea580c", // orange-600
-  PRE_APPROVE_SUPERVISOR: "#ec4899",    // pink-500
-  PRE_APPROVE_RISK_MANAGER: "#a21caf",  // fuchsia-700
-  PRE_BUSINESS_APPROVE: "#A4262C",      // brand red
-  BUSINESS_APPROVE: "#7c3aed",          // violet-600
-  APPROVE: "#059669",                   // emerald-600
-  REJECT: "#475569",                    // slate-700
-  "(none)": "#cbd5e1",                  // slate-300
+  REGISTER: "#3b82f6",                       // blue-500
+  PRE_BUSINESS_APPROVE: "#A4262C",           // brand red
+  BUSINESS_APPROVE: "#7c3aed",               // violet-600
+  PRE_APPROVE_OPERATION: "#f59e0b",          // amber-500
+  PRE_APPROVE_OPERATION_MANAGER: "#ea580c",  // orange-600
+  PRE_APPROVE_RISK: "#d946ef",               // fuchsia-500
+  PRE_APPROVE_RISK_MANAGER: "#a21caf",       // fuchsia-700
+  PRE_APPROVE_SUPERVISOR: "#ec4899",         // pink-500
+  PRE_APPROVE_MANAGER: "#be185d",            // pink-700
+  PRE_APPROVE_DOCUMENT: "#14b8a6",           // teal-500
+  WAITING_SANDBOX: "#06b6d4",                // cyan-500
+  COMPLETE_SANDBOX: "#84cc16",               // lime-500
+  APPROVE: "#059669",                        // emerald-600
+  REJECT: "#475569",                         // slate-700
 };
 
-type SortKey = "merchant_no" | "age_days" | "state" | "partner_no";
+type SortKey =
+  | "merchant_no"
+  | "age_days"
+  | "days_at_stage"
+  | "state"
+  | "partner_no"
+  | "owner_name";
 type SortDir = "asc" | "desc";
 
 function fmtDate(s: string | null): string {
@@ -100,21 +141,29 @@ function fmtDate(s: string | null): string {
   return s.slice(0, 10);
 }
 
+// dd/mm/yyyy for the Stuck table's Created and State Latest Change columns.
+function fmtDateDmy(s: string | null): string {
+  if (!s) return "—";
+  const ymd = s.slice(0, 10);
+  const [y, m, d] = ymd.split("-");
+  if (!y || !m || !d) return "—";
+  return `${d}/${m}/${y}`;
+}
+
 export default function OnboardingFunnelPage() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stuckDays, setStuckDays] = useState(30);
   const [filterState, setFilterState] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("age_days");
+  const [sortKey, setSortKey] = useState<SortKey>("days_at_stage");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`/api/onboarding-funnel?stuckDays=${stuckDays}`)
+    fetch(`/api/onboarding-funnel`)
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? `Query failed (${res.status})`);
@@ -132,7 +181,7 @@ export default function OnboardingFunnelPage() {
     return () => {
       cancelled = true;
     };
-  }, [stuckDays]);
+  }, []);
 
   const inPipelineStates = useMemo(
     () =>
@@ -175,7 +224,8 @@ export default function OnboardingFunnelPage() {
           (r.company_name_th ?? "").toLowerCase().includes(q) ||
           (r.merchant_name_en ?? "").toLowerCase().includes(q) ||
           (r.merchant_name_th ?? "").toLowerCase().includes(q) ||
-          (r.partner_no ?? "").toLowerCase().includes(q),
+          (r.partner_no ?? "").toLowerCase().includes(q) ||
+          (r.owner_name ?? "").toLowerCase().includes(q),
       );
     }
     const dir = sortDir === "asc" ? 1 : -1;
@@ -191,8 +241,27 @@ export default function OnboardingFunnelPage() {
           return dir * a.state.localeCompare(b.state);
         case "partner_no":
           return dir * (a.partner_no ?? "").localeCompare(b.partner_no ?? "");
-        case "age_days":
-          return dir * (a.age_days - b.age_days);
+        case "owner_name":
+          return dir * (a.owner_name ?? "").localeCompare(b.owner_name ?? "");
+        case "age_days": {
+          // Rows without a create_date have null age — keep them at the
+          // bottom regardless of sort direction so they don't dominate the
+          // "oldest first" view.
+          const av = a.age_days;
+          const bv = b.age_days;
+          if (av === null && bv === null) return 0;
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          return dir * (av - bv);
+        }
+        case "days_at_stage": {
+          const av = a.days_at_stage;
+          const bv = b.days_at_stage;
+          if (av === null && bv === null) return 0;
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          return dir * (av - bv);
+        }
       }
     });
     return rows;
@@ -209,7 +278,11 @@ export default function OnboardingFunnelPage() {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
     } else {
       setSortKey(k);
-      setSortDir(k === "merchant_no" || k === "partner_no" ? "asc" : "desc");
+      setSortDir(
+        k === "merchant_no" || k === "partner_no" || k === "owner_name"
+          ? "asc"
+          : "desc",
+      );
     }
   }
 
@@ -224,46 +297,32 @@ export default function OnboardingFunnelPage() {
       "Brand (TH)": r.merchant_name_th ?? "",
       "Person Type": r.person_type ?? "",
       State: STATE_LABEL[r.state] ?? r.state,
+      Owner: r.owner_name ?? "",
       Partner: r.partner_no ?? "",
+      "Create Date": fmtDateDmy(r.create_date),
+      "State Latest Change": fmtDateDmy(r.state_changed_at),
       "Register Date": fmtDate(r.register_date),
-      "Age (days)": r.age_days,
+      "Age (days)": r.age_days ?? "",
+      "Days at Stage": r.days_at_stage ?? "",
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Stuck Merchants");
     const stamp = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `OnboardingFunnel_Stuck_${stuckDays}d_${stamp}.xlsx`);
+    XLSX.writeFile(wb, `OnboardingFunnel_Stuck_${stamp}.xlsx`);
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">Onboarding Funnel</h1>
-        <p className="text-slate-600">
-          Merchants by onboarding state, with aging from register date.
-        </p>
-      </div>
-
-      <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-card flex flex-wrap items-end gap-4">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-600">
-            Stuck threshold (days in pipeline)
-          </span>
-          <select
-            value={stuckDays}
-            onChange={(e) => setStuckDays(Number(e.target.value))}
-            className="px-3 py-2 border border-slate-300 rounded-md text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none hover:border-slate-400 transition-colors min-w-[180px]"
-          >
-            {STUCK_THRESHOLDS.map((n) => (
-              <option key={n} value={n}>
-                ≥ {n} days
-              </option>
-            ))}
-          </select>
-        </label>
-
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-1">Onboarding Funnel</h1>
+          <p className="text-slate-600">
+            Merchants by onboarding state, with aging from create date.
+          </p>
+        </div>
         {loading && (
-          <div className="ml-auto text-sm text-slate-500 flex items-center gap-1.5">
+          <div className="text-sm text-slate-500 flex items-center gap-1.5 pt-2">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
             Loading…
           </div>
@@ -312,9 +371,9 @@ export default function OnboardingFunnelPage() {
                   <path d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.74-3l-7-12a2 2 0 00-3.48 0l-7 12A2 2 0 005 19z" />
                 </svg>
               }
-              label={`Stuck ≥ ${stuckDays} days`}
+              label="Stuck in Pipeline"
               value={data.stuck.length.toLocaleString()}
-              sub="Non-terminal, register date older than threshold"
+              sub="Any merchant past Register and not yet Approved/Rejected"
             />
             <KpiCard
               accent="bg-slate-700"
@@ -358,8 +417,31 @@ export default function OnboardingFunnelPage() {
                     tick={{ textAnchor: "end" }}
                   />
                   <Tooltip
-                    contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0" }}
-                    formatter={(value: number) => [value.toLocaleString(), "Merchants"]}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload as {
+                        state: string;
+                        rawState: string;
+                        count: number;
+                      };
+                      const desc = STATE_DESCRIPTION[d.rawState];
+                      return (
+                        <div className="bg-white border border-slate-200 rounded-md shadow-md p-3 text-xs max-w-xs">
+                          <div className="font-mono font-semibold text-slate-900">
+                            {d.state}
+                          </div>
+                          {desc && (
+                            <div className="text-slate-600 mt-1 leading-snug">{desc}</div>
+                          )}
+                          <div className="mt-2 text-slate-800">
+                            <span className="font-mono font-semibold tabular-nums">
+                              {d.count.toLocaleString()}
+                            </span>
+                            <span className="text-slate-500 ml-1">merchants</span>
+                          </div>
+                        </div>
+                      );
+                    }}
                   />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                     {funnelChart.map((d) => (
@@ -386,7 +468,7 @@ export default function OnboardingFunnelPage() {
                 <h3 className="text-lg font-semibold text-slate-800">
                   Stage Breakdown
                   <span className="text-sm font-normal text-slate-500 ml-2">
-                    Aging by register date
+                    Aging by create date
                   </span>
                 </h3>
               </div>
@@ -411,7 +493,10 @@ export default function OnboardingFunnelPage() {
                     return (
                       <tr key={s.state} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-4 py-2">
-                          <span className="inline-flex items-center gap-2">
+                          <span
+                            className="inline-flex items-center gap-2 cursor-help"
+                            title={STATE_DESCRIPTION[s.state] ?? ""}
+                          >
                             <span
                               className="inline-block w-2 h-2 rounded-full"
                               style={{ backgroundColor: color }}
@@ -428,9 +513,9 @@ export default function OnboardingFunnelPage() {
                         <AgeCell value={s.age_8_30} />
                         <AgeCell value={s.age_31_90} warn={s.state !== "APPROVE" && s.state !== "REJECT"} />
                         <AgeCell value={s.age_90_plus} warn={s.state !== "APPROVE" && s.state !== "REJECT"} bad />
-                        <AgeCell value={s.no_register_date} />
+                        <AgeCell value={s.no_create_date} />
                         <td className="px-4 py-2 font-mono text-xs text-slate-600">
-                          {fmtDate(s.oldest_register_date)}
+                          {fmtDate(s.oldest_create_date)}
                         </td>
                       </tr>
                     );
@@ -447,7 +532,7 @@ export default function OnboardingFunnelPage() {
                 <h3 className="text-lg font-semibold text-slate-800">
                   Stuck Merchants
                   <span className="text-sm font-normal text-slate-500 ml-2">
-                    {filteredStuck.length.toLocaleString()} of {data.stuck.length.toLocaleString()} (≥ {stuckDays} days)
+                    {filteredStuck.length.toLocaleString()} of {data.stuck.length.toLocaleString()} in pipeline
                   </span>
                 </h3>
               </div>
@@ -459,7 +544,7 @@ export default function OnboardingFunnelPage() {
                 >
                   <option value="all">All stages</option>
                   {stuckStateOptions.map((s) => (
-                    <option key={s} value={s}>
+                    <option key={s} value={s} title={STATE_DESCRIPTION[s] ?? ""}>
                       {STATE_LABEL[s] ?? s}
                     </option>
                   ))}
@@ -468,7 +553,7 @@ export default function OnboardingFunnelPage() {
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search merchant / company / partner…"
+                  placeholder="Search merchant / Merchant / partner…"
                   className="px-3 py-1.5 border border-slate-300 rounded-md text-sm w-64 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
                 />
                 <button
@@ -493,23 +578,30 @@ export default function OnboardingFunnelPage() {
                     <SortHeader k="merchant_no" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort}>
                       Merchant No
                     </SortHeader>
-                    <th className="px-4 py-2.5 font-semibold">Company</th>
+                    <th className="px-4 py-2.5 font-semibold">Merchant</th>
                     <SortHeader k="state" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort}>
                       Stage
+                    </SortHeader>
+                    <SortHeader k="owner_name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort}>
+                      Owner
                     </SortHeader>
                     <SortHeader k="partner_no" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort}>
                       Partner
                     </SortHeader>
-                    <th className="px-4 py-2.5 font-semibold">Registered</th>
+                    <th className="px-4 py-2.5 font-semibold">Created</th>
+                    <th className="px-4 py-2.5 font-semibold whitespace-nowrap">State Change</th>
                     <SortHeader k="age_days" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} numeric>
                       Age (days)
+                    </SortHeader>
+                    <SortHeader k="days_at_stage" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} numeric>
+                      Stuck at stage
                     </SortHeader>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStuck.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-slate-500">
+                      <td colSpan={9} className="text-center py-12 text-slate-500">
                         No stuck merchants for these filters.
                       </td>
                     </tr>
@@ -549,24 +641,51 @@ export default function OnboardingFunnelPage() {
                         </td>
                         <td className="px-4 py-2">
                           <span
-                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium"
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium cursor-help"
                             style={{ backgroundColor: `${color}15`, color }}
+                            title={STATE_DESCRIPTION[r.state] ?? ""}
                           >
                             {STATE_LABEL[r.state] ?? r.state}
                           </span>
                         </td>
+                        <td className="px-4 py-2 text-xs text-slate-700 whitespace-nowrap">
+                          {r.owner_name ?? "—"}
+                        </td>
                         <td className="px-4 py-2 font-mono text-xs text-slate-700">
                           {r.partner_no ?? "—"}
                         </td>
-                        <td className="px-4 py-2 font-mono text-xs text-slate-600">
-                          {fmtDate(r.register_date)}
+                        <td className="px-4 py-2 font-mono text-xs text-slate-600 whitespace-nowrap">
+                          {fmtDateDmy(r.create_date)}
+                        </td>
+                        <td className="px-4 py-2 font-mono text-xs text-slate-600 whitespace-nowrap">
+                          {fmtDateDmy(r.state_changed_at)}
                         </td>
                         <td
                           className={`px-4 py-2 text-right font-mono font-medium tabular-nums ${
-                            r.age_days >= 90 ? "text-red-700" : r.age_days >= 30 ? "text-amber-700" : "text-slate-700"
+                            r.age_days === null
+                              ? "text-slate-400"
+                              : r.age_days >= 90
+                                ? "text-red-700"
+                                : r.age_days >= 30
+                                  ? "text-amber-700"
+                                  : "text-slate-700"
                           }`}
                         >
-                          {r.age_days.toLocaleString()}
+                          {r.age_days === null ? "—" : r.age_days.toLocaleString()}
+                        </td>
+                        <td
+                          className={`px-4 py-2 text-right font-mono font-medium tabular-nums ${
+                            r.days_at_stage === null
+                              ? "text-slate-400"
+                              : r.days_at_stage >= 30
+                                ? "text-red-700"
+                                : r.days_at_stage >= 7
+                                  ? "text-amber-700"
+                                  : "text-slate-700"
+                          }`}
+                          title="Days in current stage. For PRE_APPROVE_DOCUMENT: from CEO+COO sign-off (High risk) or COO sign-off (Med/Low). Other stages: latest of create / register / approve timestamps."
+                        >
+                          {r.days_at_stage === null ? "—" : r.days_at_stage.toLocaleString()}
                         </td>
                       </tr>
                     );
@@ -574,9 +693,9 @@ export default function OnboardingFunnelPage() {
                 </tbody>
               </table>
             </div>
-            {data.stuck.length === 500 && (
+            {data.stuck.length === 1000 && (
               <div className="px-5 py-2 text-xs text-slate-500 bg-slate-50 border-t border-slate-200">
-                Showing the 500 oldest stuck merchants. Narrow filters or raise the threshold to see fewer.
+                Showing the 1,000 oldest stuck merchants. Narrow filters to see fewer.
               </div>
             )}
           </div>

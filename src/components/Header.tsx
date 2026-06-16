@@ -32,7 +32,9 @@ const riskManagement: NavItem[] = [
   { label: "Partner & Merchant Risk", href: "/risk-management/partner-merchant-risk" },
 ];
 
-const finance: NavItem[] = [];
+const cfr: NavItem[] = [
+  { label: "Money Trace", href: "/cfr/money-trace" },
+];
 
 export async function Header() {
   const username = await getCurrentUsername();
@@ -54,7 +56,7 @@ export async function Header() {
           <NavDropdown label="Application Support" items={applicationSupport} />
           <NavDropdown label="Operation" items={operation} />
           <NavDropdown label="Risk Management" items={riskManagement} />
-          <NavDropdown label="Finance" items={finance} />
+          <NavDropdown label="CFR" items={cfr} />
         </nav>
 
         <div className="ml-auto flex items-center gap-1">
