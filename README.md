@@ -58,6 +58,7 @@ If a file is missing, the DOCX still generates — just without that person's si
 | Risk Management | Blacklist Hit Report | `/risk-management/blacklist-hits` | Merchants / partners flagged on the blacklist |
 | Risk Management | KYC / CDD Period Review | `/risk-management/kyc-cdd-review` | Per-period KYM / KYC / CDD sign-off tracker. Closed merchants always excluded; fully-approved (`state='APPROVE'`) merchants excluded from KYM / KYC (one-time checks) but kept for CDD (recurring obligation). Pre-approval rows fall back to `#<merchant_id>` + brand name + onboarding state pill. |
 | Risk Management | Partner & Merchant Risk | `/risk-management/partner-merchant-risk` | Risk + status distribution across partners (AEs) and their merchants, with per-AE rollup and side-by-side compare. Data is live from `partner_info` + `merchant_info` (no CSV upload). |
+| CFR | Money Trace | `/cfr/money-trace` | Upload a `Bank Case ID *.xlsx` → one ready-to-upload CFR form per sheet. Server-side port of the `cfrauto` desktop converter (ExcelJS over `cfr-template/TemplateAddSubCase_V17.2_Non-bank.xlsx`); download each file or all as a ZIP. No DB. |
 
 ## Where to look
 
