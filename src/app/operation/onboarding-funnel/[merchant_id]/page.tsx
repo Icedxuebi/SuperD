@@ -21,7 +21,6 @@ type Detail = {
   state: string | null;
   risk: string | null;
   partner_no: string | null;
-  partner_company_name: string | null;
   owner_name: string | null;
   owner_surname: string | null;
   create_date: string | null;
@@ -98,7 +97,6 @@ SELECT
   CASE WHEN w.merchant_id IS NOT NULL THEN 'WAITING_SANDBOX' ELSE mi.state END AS state,
   mi.risk,
   pi.partner_no,
-  pi.company_name_en                                                AS partner_company_name,
   owner.name                                                        AS owner_name,
   owner.surname                                                     AS owner_surname,
   mi.create_date::text                                              AS create_date,
@@ -458,14 +456,7 @@ export default async function StuckMerchantRemarksPage({
           <Field label="State" value={<StateBadge state={m.state} />} />
           <Field label="Person Type" value={personTypeLabel(m.person_type)} />
           <Field label="Risk" value={riskLabel(m.risk)} />
-          <Field
-            label="Partner"
-            value={
-              m.partner_no
-                ? `${m.partner_no}${m.partner_company_name ? ` — ${m.partner_company_name}` : ""}`
-                : "—"
-            }
-          />
+          <Field label="Partner" value={m.partner_no ?? "—"} mono />
           <Field label="Owner" value={staffName(m.owner_name, m.owner_surname) ?? "—"} />
           <Field label="Created" value={fmtDateOnly(m.create_date)} mono />
           <Field label="Register Date" value={fmtDateOnly(m.register_date)} mono />
