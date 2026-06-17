@@ -9,6 +9,7 @@ type MerchantRow = {
   merchant_name_en: string | null;
   email: string | null;
   state: string | null;
+  auto_reject_detail: string | null;
   approved_date: string | null;
   store_closure_date: string | null;
   store_closure_reason: string | null;
@@ -20,6 +21,7 @@ type SortKey =
   | "merchant_name_en"
   | "email"
   | "state"
+  | "auto_reject_detail"
   | "approved_date"
   | "store_closure_date"
   | "store_closure_reason";
@@ -56,6 +58,7 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean; mono?: boolean 
   { key: "merchant_name_en", label: "Merchant Name" },
   { key: "email", label: "Email" },
   { key: "state", label: "State" },
+  { key: "auto_reject_detail", label: "Auto Reject Detail" },
   { key: "approved_date", label: "Approved Date", mono: true },
   { key: "store_closure_date", label: "Store Closure Date", mono: true },
   { key: "store_closure_reason", label: "Store Closure Reason" },
@@ -299,6 +302,12 @@ export default function MerchantLookupPage() {
                   <td className="px-4 py-2 text-slate-700">{r.email ?? "—"}</td>
                   <td className="px-4 py-2 whitespace-nowrap">
                     <StateBadge state={r.state} />
+                  </td>
+                  <td
+                    className="px-4 py-2 text-slate-700 max-w-xs truncate"
+                    title={r.auto_reject_detail ?? ""}
+                  >
+                    {r.auto_reject_detail ?? "—"}
                   </td>
                   <td className="px-4 py-2 font-mono text-xs whitespace-nowrap">
                     {formatDate(r.approved_date)}

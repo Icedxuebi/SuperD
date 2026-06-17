@@ -575,6 +575,9 @@ export default function OnboardingFunnelPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 sticky top-0">
                   <tr className="text-left text-slate-600 border-b border-slate-200">
+                    <th className="px-2 py-2.5 font-semibold text-center w-10">
+                      <span className="sr-only">View details</span>
+                    </th>
                     <SortHeader k="merchant_no" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort}>
                       Merchant No
                     </SortHeader>
@@ -601,7 +604,7 @@ export default function OnboardingFunnelPage() {
                 <tbody>
                   {filteredStuck.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="text-center py-12 text-slate-500">
+                      <td colSpan={10} className="text-center py-12 text-slate-500">
                         No stuck merchants for these filters.
                       </td>
                     </tr>
@@ -619,6 +622,19 @@ export default function OnboardingFunnelPage() {
                     const color = STATE_COLOR[r.state] ?? "#A4262C";
                     return (
                       <tr key={r.merchant_id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-2 py-2 text-center">
+                          <a
+                            href={`/operation/onboarding-funnel/${r.merchant_id}`}
+                            className="inline-flex items-center justify-center text-slate-400 hover:text-brand-600 transition-colors"
+                            title="View remarks & details"
+                            aria-label={`View details for ${r.merchant_no ?? `#${r.merchant_id}`}`}
+                          >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </a>
+                        </td>
                         <td className="px-4 py-2 font-mono text-xs font-medium text-slate-800 whitespace-nowrap">
                           {r.merchant_no ? (
                             <a
