@@ -26,5 +26,16 @@ Thumbs.db
 *.tsbuildinfo
 next-env.d.ts
 
+# Power BI report projects — reference only. The cost/group formulas are baked
+# into src/ (api/finance/report + lib/finance/groups); the app never reads these
+# at runtime. Patterns cover any future .pbip you drop in, whatever its name.
+*.pbip
+*.pbix
+*.Report/
+*.SemanticModel/
+
+# Daily transaction exports — production data, never commit
+Transaction_*.csv
+
 
 
