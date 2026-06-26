@@ -36,6 +36,11 @@ const cfr: NavItem[] = [
   { label: "Money Trace", href: "/cfr/money-trace" },
 ];
 
+const finance: NavItem[] = [
+  { label: "Finance Report", href: "/finance/report" },
+  { label: "Merchant Rates", href: "/finance/merchant-rates" },
+];
+
 export async function Header() {
   const username = await getCurrentUsername();
   return (
@@ -57,6 +62,7 @@ export async function Header() {
           <NavDropdown label="Operation" items={operation} />
           <NavDropdown label="Risk Management" items={riskManagement} />
           <NavDropdown label="CFR" items={cfr} />
+          <NavDropdown label="Finance" items={finance} />
         </nav>
 
         <div className="ml-auto flex items-center gap-1">

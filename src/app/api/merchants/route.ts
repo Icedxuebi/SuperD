@@ -16,6 +16,7 @@ const SORT_COLUMNS: Record<string, string> = {
   merchant_name_en: "mi.merchant_name_en",
   email: "email",
   state: "mi.state",
+  auto_reject_detail: "mi.auto_reject_detail",
   approved_date: "mi.manager_approve_date",
   store_closure_date: "mi.close_date",
   store_closure_reason: "mi.close_remark",
@@ -35,6 +36,7 @@ function buildSql(orderBy: string, dir: "ASC" | "DESC"): string {
             LIMIT 1
         )                                    AS email,
         mi.state,
+        mi.auto_reject_detail                AS auto_reject_detail,
         mi.manager_approve_date              AS approved_date,
         mi.close_date                        AS store_closure_date,
         mi.close_remark                      AS store_closure_reason,
