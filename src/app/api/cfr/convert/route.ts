@@ -18,7 +18,11 @@ export async function POST(req: Request) {
   }
 
   const file = form.get("file");
-  if (!(file instanceof File)) {
+  // `File` became a global only in Node 20; an older prod runtime throws
+  // "File is not defined" on `file instanceof File`, crashing the handler before
+  // it can return. Narrow without touching the global File constructor — a
+  // FormData entry is either a string (non-file field) or a File (extends Blob).
+  if (file === null || typeof file === "string") {
     return NextResponse.json(
       { error: 'No file uploaded. Attach the Bank Case ID .xlsx as "file".' },
       { status: 400 },
