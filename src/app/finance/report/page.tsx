@@ -19,6 +19,13 @@ type PartnerOut = {
   fee: number;
   net: number;
 };
+type CostProfit = {
+  bankCost: number;
+  agencyCommission: number;
+  totalCost: number;
+  grossProfit: number;
+};
+type FlowView = "total" | "payment" | "transfer";
 type ReportResponse = {
   date: string;
   payment: FlowTotals;
@@ -29,6 +36,7 @@ type ReportResponse = {
   bankCost: number;
   totalCost: number;
   grossProfit: number;
+  costProfit: { payment: CostProfit; transfer: CostProfit; total: CostProfit };
   byPartner: PartnerOut[];
   byGroup: { group: string; txn: number; net: number }[];
   cached: boolean;
@@ -218,8 +226,20 @@ function Controls({
 // ===========================================================================
 
 function Report({ data }: { data: ReportResponse }) {
-  const { summary, payment, transfer, agencyCommission, bankCost, totalCost, grossProfit } = data;
-  const revenue = summary.fee;
+  const [view, setView] = useState<FlowView>("total");
+  const { summary, payment, transfer } = data;
+
+  // The Summary / Cost / Profit cards follow the view toggle (Payment In =
+  // payment flow, Payment Out = transfer flow, Total = both). The two agency
+  // tables below always stay on the Total figures.
+  const flow = view === "payment" ? payment : view === "transfer" ? transfer : summary;
+  const cp =
+    view === "payment"
+      ? data.costProfit.payment
+      : view === "transfer"
+        ? data.costProfit.transfer
+        : data.costProfit.total;
+  const revenue = flow.fee;
 
   return (
     <>
@@ -245,27 +265,34 @@ function Report({ data }: { data: ReportResponse }) {
         )}
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Summary · Cost · Profit
+        </h2>
+        <ViewToggle value={view} onChange={setView} />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <MetricPanel title="Transaction Summary" accent="bg-brand-600">
-          <Metric emphasis label="Accumulated transaction numbers" sub="จำนวนรายการ" value={fmtInt(summary.txn)} />
-          <Metric label="Accumulated gross paid amount" value={fmtMoney(summary.gross)} />
-          <Metric emphasis label="Accumulated transaction value (net)" value={fmtMoney(summary.net)} />
-          <Metric label="Accumulated fee amount" sub="รายได้" value={fmtMoney(summary.fee)} />
-          <Metric emphasis label="Fee vs transaction value (net)" value={fmtPct(summary.net ? summary.fee / summary.net : NaN)} />
+          <Metric emphasis label="Accumulated transaction numbers" sub="จำนวนรายการ" value={fmtInt(flow.txn)} />
+          <Metric label="Accumulated gross paid amount" value={fmtMoney(flow.gross)} />
+          <Metric emphasis label="Accumulated transaction value (net)" value={fmtMoney(flow.net)} />
+          <Metric label="Accumulated fee amount" sub="รายได้" value={fmtMoney(flow.fee)} />
+          <Metric emphasis label="Fee vs transaction value (net)" value={fmtPct(flow.net ? flow.fee / flow.net : NaN)} />
         </MetricPanel>
 
         <MetricPanel title="Cost" accent="bg-slate-800" note="Bank cost = per-transaction acquirer fee by gateway channel.">
-          <Metric label="Transaction numbers" sub="จำนวนรายการ" value={fmtInt(summary.txn)} />
-          <Metric emphasis label="Cost to pay bank" sub="ต้นทุนเพื่อจ่ายธนาคาร" value={fmtMoney(bankCost)} />
-          <Metric label="Agency commission cost" sub="ต้นทุนเพื่อจ่ายค่าคอมเอเจนซี่" value={fmtMoney(agencyCommission)} />
-          <Metric emphasis label="Total cost" sub="ต้นทุนรวม" value={fmtMoney(totalCost)} />
+          <Metric label="Transaction numbers" sub="จำนวนรายการ" value={fmtInt(flow.txn)} />
+          <Metric emphasis label="Cost to pay bank" sub="ต้นทุนเพื่อจ่ายธนาคาร" value={fmtMoney(cp.bankCost)} />
+          <Metric label="Agency commission cost" sub="ต้นทุนเพื่อจ่ายค่าคอมเอเจนซี่" value={fmtMoney(cp.agencyCommission)} />
+          <Metric emphasis label="Total cost" sub="ต้นทุนรวม" value={fmtMoney(cp.totalCost)} />
         </MetricPanel>
 
         <MetricPanel title="Profit" accent="bg-accent-500">
-          <Metric emphasis label="Transaction value" sub="ยอดธุรกรรม" value={fmtMoney(summary.gross)} />
+          <Metric emphasis label="Transaction value" sub="ยอดธุรกรรม" value={fmtMoney(flow.gross)} />
           <Metric label="Revenue" sub="รายได้" value={fmtMoney(revenue)} />
-          <Metric emphasis label="Gross profit" sub="กำไรขั้นต้น" value={fmtMoney(grossProfit)} />
-          <Metric label="Profit vs revenue" sub="กำไรเทียบรายได้" value={fmtPct(revenue ? grossProfit / revenue : NaN)} />
+          <Metric emphasis label="Gross profit" sub="กำไรขั้นต้น" value={fmtMoney(cp.grossProfit)} />
+          <Metric label="Profit vs revenue" sub="กำไรเทียบรายได้" value={fmtPct(revenue ? cp.grossProfit / revenue : NaN)} />
         </MetricPanel>
       </div>
 
@@ -274,6 +301,41 @@ function Report({ data }: { data: ReportResponse }) {
         <AgencyGroupTable rows={data.byGroup} totalTxn={summary.txn} totalNet={summary.net} />
       </div>
     </>
+  );
+}
+
+// ---- view toggle ----------------------------------------------------------
+
+function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: FlowView;
+  onChange: (v: FlowView) => void;
+}) {
+  const opts: { key: FlowView; label: string }[] = [
+    { key: "payment", label: "Payment In" },
+    { key: "transfer", label: "Payment Out" },
+    { key: "total", label: "Total" },
+  ];
+  return (
+    <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 shadow-sm">
+      {opts.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          onClick={() => onChange(o.key)}
+          aria-pressed={value === o.key}
+          className={`px-3.5 py-1.5 text-sm font-medium rounded-md transition-colors ${
+            value === o.key
+              ? "bg-brand-600 text-white shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

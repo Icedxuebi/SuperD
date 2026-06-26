@@ -38,6 +38,7 @@ const cfr: NavItem[] = [
 
 const finance: NavItem[] = [
   { label: "Finance Report", href: "/finance/report" },
+  { label: "Merchant Rates", href: "/finance/merchant-rates" },
 ];
 
 export async function Header() {

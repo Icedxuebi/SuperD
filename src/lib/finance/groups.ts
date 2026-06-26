@@ -43,6 +43,7 @@ export const PARTNER_GROUP: Record<string, string> = {
   AE000067: "K.Oil",
   // single-AE groups
   AE000085: "K.BANK (AE026)",
+  AE000089: "K.BANK (AE026)",
   AE000076: "K.BANK (AE076)",
   AE000075: "K.TUL",
   AE000006: "K.POP",

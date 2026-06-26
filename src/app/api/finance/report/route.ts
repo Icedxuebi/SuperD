@@ -50,6 +50,13 @@ type CommissionRow = {
 
 type FlowTotals = { txn: number; gross: number; fee: number; net: number };
 
+type CostProfit = {
+  bankCost: number;
+  agencyCommission: number;
+  totalCost: number;
+  grossProfit: number;
+};
+
 type PartnerOut = {
   partner_no: string;
   group: string;
@@ -69,6 +76,7 @@ type ReportResponse = {
   bankCost: number;
   totalCost: number;
   grossProfit: number;
+  costProfit: { payment: CostProfit; transfer: CostProfit; total: CostProfit };
   byPartner: PartnerOut[];
   byGroup: { group: string; txn: number; net: number }[];
   cached: boolean;
@@ -212,7 +220,9 @@ export async function GET(req: Request) {
 
   if (!refresh) {
     const hit = cache.get(date);
-    if (hit) {
+    // Ignore entries cached before costProfit was added (dev hot-reload keeps
+    // the cache warm across code changes) so the response shape is always current.
+    if (hit && hit.data.costProfit) {
       return NextResponse.json({ ...hit.data, cached: true });
     }
   }
@@ -277,12 +287,35 @@ export async function GET(req: Request) {
       trf_anypay: 0,
     };
 
-    const agencyCommission = c.pay_partner + c.trf_partner;
-    const bankCost =
-      paymentRows.reduce((a, r) => a + r.bank_cost, 0) +
-      transferRows.reduce((a, r) => a + r.bank_cost, 0);
-    const totalCost = bankCost + agencyCommission;
-    const grossProfit = summary.fee - totalCost;
+    // Cost + profit, computed per flow so the report can show Payment In
+    // (payment), Payment Out (transfer) or the combined Total. Bank cost is the
+    // per-row 'cost in'/'cost out' acquirer fee; agency commission is the
+    // partner share, already split by flow in COMMISSION_SQL.
+    const bankCostPay = paymentRows.reduce((a, r) => a + r.bank_cost, 0);
+    const bankCostTrf = transferRows.reduce((a, r) => a + r.bank_cost, 0);
+    const costProfitFor = (
+      fee: number,
+      bank: number,
+      commission: number,
+    ): CostProfit => {
+      const total = bank + commission;
+      return {
+        bankCost: bank,
+        agencyCommission: commission,
+        totalCost: total,
+        grossProfit: fee - total,
+      };
+    };
+    const costProfit = {
+      payment: costProfitFor(payment.fee, bankCostPay, c.pay_partner),
+      transfer: costProfitFor(transfer.fee, bankCostTrf, c.trf_partner),
+      total: costProfitFor(
+        summary.fee,
+        bankCostPay + bankCostTrf,
+        c.pay_partner + c.trf_partner,
+      ),
+    };
+    const { bankCost, agencyCommission, totalCost, grossProfit } = costProfit.total;
 
     const data: ReportResponse = {
       date,
@@ -294,6 +327,7 @@ export async function GET(req: Request) {
       bankCost,
       totalCost,
       grossProfit,
+      costProfit,
       byPartner,
       byGroup,
       cached: false,
