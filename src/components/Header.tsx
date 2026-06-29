@@ -30,6 +30,7 @@ const riskManagement: NavItem[] = [
   { label: "Blacklist Hit Report", href: "/risk-management/blacklist-hits" },
   { label: "KYC / CDD Period Review", href: "/risk-management/kyc-cdd-review" },
   { label: "Partner & Merchant Risk", href: "/risk-management/partner-merchant-risk" },
+  { label: "Gambling Risk", href: "/risk-management/gambling-risk" },
 ];
 
 const cfr: NavItem[] = [
