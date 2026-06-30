@@ -12,9 +12,11 @@ export const dynamic = "force-dynamic";
 // A day's report combines two flows:
 //   • PAYMENT  — payment_transaction rows whose settle_due = <day> (status 'S')
 //   • TRANSFER — transfer_transaction rows whose transfer_date is on <day>
-// Counts/amounts are the union of both. Verified against the daily exports
-// (Transaction_All / Transaction_Transfer): for 2026-06-23 this reproduces
-// 546,626 txn / 360,570,469.68 gross / 356,923,156.49 net to the cent.
+// Counts/gross are the union of both. `net` is signed by flow (see
+// partnerAggHead): payment nets fee+VAT off, transfer adds fee+VAT on — this
+// matches the finance Power BI model. Verified against the daily exports
+// (Transaction_All / Transaction_Transfer): 2026-06-29 reproduces
+// 370,337 txn / 271,428,738.81 gross / 270,417,767.71 net to the cent.
 //
 // Performance notes (the replica has no FK indexes we can add):
 //   • payment uses index pt_generate_summary(status, settle_due)        → ~1s
@@ -105,15 +107,21 @@ const COST_IN_SQL = `CASE
          ELSE 0 END`;
 const COST_OUT_SQL = `CASE WHEN gc.merchant_id = '010555915430956' THEN 5 ELSE 3.50 END`;
 
-const PARTNER_AGG_HEAD = `
+// Per-partner aggregate head. `net` is the merchant-facing value and its sign
+// differs by flow:
+//   • PAYMENT  (money in)  net = gross − fee − VAT  — what the merchant receives.
+//   • TRANSFER (money out) net = gross + fee + VAT  — total debited from the
+//     merchant (withdrawal principal plus its fee+VAT charge).
+// fee*(1+VAT_RATE) == fee + vat, since vat is always fee*VAT_RATE.
+const partnerAggHead = (netSign: "+" | "-") => `
        COALESCE(pi.partner_no, '(unknown)')                       AS partner_no,
        count(*)::int                                              AS txn,
        (sum(t.amount))::float8                                    AS gross,
        (sum(t.fee))::float8                                       AS fee,
-       (sum(t.amount) - sum(t.fee) * (1 + $2::numeric))::float8   AS net`;
+       (sum(t.amount) ${netSign} sum(t.fee) * (1 + $2::numeric))::float8 AS net`;
 
 const PAYMENT_SQL = `
-  SELECT ${PARTNER_AGG_HEAD},
+  SELECT ${partnerAggHead("-")},
          (sum(${COST_IN_SQL}))::float8                            AS bank_cost
     FROM payment_transaction t
     LEFT JOIN merchant_info   mi ON mi.id = t.merchant_id
@@ -123,7 +131,7 @@ const PAYMENT_SQL = `
    GROUP BY 1`;
 
 const TRANSFER_SQL = `
-  SELECT ${PARTNER_AGG_HEAD},
+  SELECT ${partnerAggHead("+")},
          (sum(${COST_OUT_SQL}))::float8                           AS bank_cost
     FROM transfer_transaction t
     LEFT JOIN merchant_info   mi ON mi.id = t.merchant_id
