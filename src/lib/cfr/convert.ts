@@ -34,7 +34,6 @@ const REQUIRED_HEADERS = [
   "Bank Name",
   "ToBankID",
   "Amount",
-  "ผู้รับโอน",
   "ยอดเงินที่ควรระงับ",
 ] as const;
 
@@ -175,7 +174,13 @@ async function writeCaseFile(
   // Row 12+: one row per transaction
   dataRowNumbers.forEach((srcRow, i) => {
     const excelRow = 12 + i;
-    const [sendFirst, sendLast] = splitName(cellStr(at(srcRow, "ผู้รับโอน")));
+    // Recipient first/last name: prefer splitting the "ผู้รับโอน" (L) full-name
+    // column when it's populated; otherwise fall back to the Name (D) and
+    // Surname (E) columns.
+    const recipient = cellStr(at(srcRow, "ผู้รับโอน"));
+    const [sendFirst, sendLast] = recipient
+      ? splitName(recipient)
+      : [cellStr(at(srcRow, "Name")), cellStr(at(srcRow, "Surname"))];
     const set = (c: number, value: ExcelJS.CellValue) => {
       ws.getRow(excelRow).getCell(c).value = value;
     };
