@@ -174,13 +174,11 @@ async function writeCaseFile(
   // Row 12+: one row per transaction
   dataRowNumbers.forEach((srcRow, i) => {
     const excelRow = 12 + i;
-    // Recipient first/last name: prefer splitting the "ผู้รับโอน" (L) full-name
-    // column when it's populated; otherwise fall back to the Name (D) and
-    // Surname (E) columns.
+    // Recipient first/last name: split the "ผู้รับโอน" (L) full-name column when
+    // it's populated; when L is empty, leave both names blank (the source files
+    // now routinely arrive with L empty).
     const recipient = cellStr(at(srcRow, "ผู้รับโอน"));
-    const [sendFirst, sendLast] = recipient
-      ? splitName(recipient)
-      : [cellStr(at(srcRow, "Name")), cellStr(at(srcRow, "Surname"))];
+    const [sendFirst, sendLast] = recipient ? splitName(recipient) : ["", ""];
     const set = (c: number, value: ExcelJS.CellValue) => {
       ws.getRow(excelRow).getCell(c).value = value;
     };
