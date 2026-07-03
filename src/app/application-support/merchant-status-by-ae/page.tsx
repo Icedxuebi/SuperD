@@ -267,7 +267,7 @@ export default function MerchantStatusByAePage() {
               }
               label="Active"
               value={data.totals.active.toLocaleString()}
-              sub={`${formatPct(activeRate)} of approved merchants`}
+              sub={`${formatPct(activeRate)} of operating merchants`}
             />
             <KpiCard
               accent="bg-slate-500"
@@ -287,7 +287,7 @@ export default function MerchantStatusByAePage() {
               }
               label="Inactive"
               value={data.totals.inactive.toLocaleString()}
-              sub={`${formatPct(1 - activeRate)} of approved merchants`}
+              sub={`${formatPct(1 - activeRate)} of operating merchants`}
             />
             <KpiCard
               accent="bg-brand-600"
@@ -305,7 +305,7 @@ export default function MerchantStatusByAePage() {
                   <path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M9 11a4 4 0 100-8 4 4 0 000 8zm6 0a4 4 0 100-8 4 4 0 000 8z" />
                 </svg>
               }
-              label="Approved merchants"
+              label="Operating merchants"
               value={data.totals.total.toLocaleString()}
               sub={`Across ${data.partners.length} partner${data.partners.length === 1 ? "" : "s"}`}
             />
@@ -525,7 +525,7 @@ export default function MerchantStatusByAePage() {
                   {sortedPartners.length === 0 && (
                     <tr>
                       <td colSpan={6} className="text-center py-12 text-slate-500">
-                        No approved merchants for this date.
+                        No operating merchants for this date.
                       </td>
                     </tr>
                   )}

@@ -35,6 +35,7 @@ export const PARTNER_GROUP: Record<string, string> = {
   AE000036: "K.Oil",
   AE000070: "K.Oil",
   AE000051: "K.Oil",
+  AE000053: "K.Oil",
   AE000079: "K.Oil",
   AE000074: "K.Oil",
   AE000031: "K.Oil",
