@@ -95,17 +95,26 @@ const cache = (globalForCache.__financeReportCache ??= new Map<string, CacheEntr
 // Bank (acquirer) cost per transaction, keyed on the gateway channel
 // (gateway_channel.merchant_id, reached via gwc_id). These mirror the
 // 'cost in' / 'cost out' calculated columns in the finance Power BI model
-// (2026 June.pbip) exactly — verified to reproduce 989,755.09 for 2026-06-23.
-// Constants only (no user input), so inlining them in the CASE is safe.
+// (2026 July.pbip) exactly. Constants only (no user input), so inlining them
+// in the CASE is safe.
+//
+// Updated June → July: cost in gained …901 → 2 and …971 → 1.5; cost out was
+// reworked — …956 dropped 5 → 3.5, …901 added → 5, …971 added → 3.5, and the
+// default rose 3.50 → 3.75.
 const COST_IN_SQL = `CASE
          WHEN gc.merchant_id IN
            ('010555915430964','010555915430959','010555915430960',
-            '010555915430962','010555915430963','010555915430967') THEN 2
+            '010555915430962','010555915430963','010555915430967',
+            '010555915430901') THEN 2
          WHEN gc.merchant_id = '010555915430956' THEN 1
+         WHEN gc.merchant_id = '010555915430971' THEN 1.5
          WHEN gc.merchant_id IN ('010555915430961','010555915430968')
            THEN (CASE WHEN t.amount > 150 THEN 0.01 * t.amount ELSE 1.5 END)
          ELSE 0 END`;
-const COST_OUT_SQL = `CASE WHEN gc.merchant_id = '010555915430956' THEN 5 ELSE 3.50 END`;
+const COST_OUT_SQL = `CASE
+         WHEN gc.merchant_id = '010555915430901' THEN 5
+         WHEN gc.merchant_id IN ('010555915430956','010555915430971') THEN 3.50
+         ELSE 3.75 END`;
 
 // Per-partner aggregate head. `net` is the merchant-facing value and its sign
 // differs by flow:
