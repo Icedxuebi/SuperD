@@ -25,7 +25,9 @@ import {
 // ---- domains + colours ----------------------------------------------------
 
 const RISK_ORDER = ["High", "Medium", "Low", "Unrated"] as const;
-const STATUS_ORDER = ["Active", "Inactive", "Closed"] as const;
+// Active / Inactive / Close mirror the merchant rule in /api/partner-merchant-risk;
+// Other catches the onboarding pipeline, rejected, and the undefined approved combo.
+const STATUS_ORDER = ["Active", "Inactive", "Close", "Other"] as const;
 type Risk = (typeof RISK_ORDER)[number];
 type Status = (typeof STATUS_ORDER)[number];
 
@@ -39,7 +41,8 @@ const RISK_COLORS: Record<Risk, string> = {
 const STATUS_COLORS: Record<Status, string> = {
   Active: "#059669",
   Inactive: "#A4262C",
-  Closed: "#1e293b",
+  Close: "#1e293b",
+  Other: "#94a3b8",
 };
 
 // ---- row shapes (match the API response) ---------------------------------
@@ -47,7 +50,9 @@ const STATUS_COLORS: Record<Status, string> = {
 type PartnerRow = { ae: string | null; status: Status; risk: Risk };
 type MerchantRow = {
   code: string | null;
+  name: string | null;
   status: Status;
+  closeReason: string | null;
   risk: Risk;
   ae: string | null;
 };
@@ -72,7 +77,7 @@ function tallyRisk<T extends { risk: Risk }>(rows: T[]): Record<Risk, number> {
 function tallyStatus<T extends { status: Status }>(
   rows: T[],
 ): Record<Status, number> {
-  const out: Record<Status, number> = { Active: 0, Inactive: 0, Closed: 0 };
+  const out: Record<Status, number> = { Active: 0, Inactive: 0, Close: 0, Other: 0 };
   for (const r of rows) out[r.status]++;
   return out;
 }
@@ -225,7 +230,7 @@ function Dashboard({
           partnerRisk: null,
           merchants: 0,
           risk: { High: 0, Medium: 0, Low: 0, Unrated: 0 },
-          status: { Active: 0, Inactive: 0, Closed: 0 },
+          status: { Active: 0, Inactive: 0, Close: 0, Other: 0 },
         };
         map.set(ae, r);
       }
@@ -422,6 +427,8 @@ function Dashboard({
         selected={selectedAEs}
         onToggle={toggleAe}
       />
+
+      <MerchantListTable merchants={merchantRecords} selected={selectedAEs} />
     </>
   );
 }
@@ -1065,12 +1072,13 @@ function RollupTable({
       Unrated: r.risk.Unrated,
       "Active (merchants)": r.status.Active,
       "Inactive (merchants)": r.status.Inactive,
-      "Closed (merchants)": r.status.Closed,
+      "Close (merchants)": r.status.Close,
+      "Other (merchants)": r.status.Other,
       "High %": r.merchants > 0 ? r.risk.High / r.merchants : 0,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
-    const pctCol = 11; // "High %"
+    const pctCol = 12; // "High %"
     for (let row = range.s.r + 1; row <= range.e.r; row++) {
       const cell = ws[XLSX.utils.encode_cell({ r: row, c: pctCol })];
       if (cell) cell.z = "0.0%";
@@ -1238,7 +1246,183 @@ function RollupTable({
   );
 }
 
-function RTh({
+type MerchantSortKey = "ae" | "code" | "name" | "status" | "risk";
+
+function MerchantListTable({
+  merchants,
+  selected,
+}: {
+  merchants: MerchantRow[];
+  selected: Set<string>;
+}) {
+  const [sortKey, setSortKey] = useState<MerchantSortKey>("ae");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const rows = useMemo(
+    () => merchants.filter((m) => m.ae !== null && selected.has(m.ae)),
+    [merchants, selected],
+  );
+
+  const sorted = useMemo(() => {
+    const arr = [...rows];
+    const dir = sortDir === "asc" ? 1 : -1;
+    const str = (v: string | null) => v ?? "";
+    const byCode = (a: MerchantRow, b: MerchantRow) =>
+      str(a.code).localeCompare(str(b.code));
+    arr.sort((a, b) => {
+      switch (sortKey) {
+        case "ae":
+          return dir * str(a.ae).localeCompare(str(b.ae)) || byCode(a, b);
+        case "code":
+          return dir * byCode(a, b);
+        case "name":
+          return dir * str(a.name).localeCompare(str(b.name)) || byCode(a, b);
+        case "status":
+          return (
+            dir *
+              (STATUS_ORDER.indexOf(a.status) -
+                STATUS_ORDER.indexOf(b.status)) || byCode(a, b)
+          );
+        case "risk":
+          return (
+            dir * (RISK_ORDER.indexOf(a.risk) - RISK_ORDER.indexOf(b.risk)) ||
+            byCode(a, b)
+          );
+      }
+    });
+    return arr;
+  }, [rows, sortKey, sortDir]);
+
+  function toggleSort(k: MerchantSortKey) {
+    if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(k);
+      setSortDir("asc");
+    }
+  }
+
+  function exportExcel() {
+    const out = sorted.map((m) => ({
+      AE: m.ae ?? "",
+      MID: m.code ?? "",
+      "Merchant Name (EN)": m.name ?? "",
+      Status: m.status,
+      Risk: m.risk,
+      "Closure Reason": m.closeReason ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(out);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Merchants");
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `merchants-by-ae-${stamp}.xlsx`);
+  }
+
+  return (
+    <div className="bg-white border border-slate-200/80 rounded-xl shadow-card overflow-hidden">
+      <div className="flex items-center justify-between p-5 border-b border-slate-200">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-1 h-5 rounded-full bg-slate-800" />
+          <h3 className="text-lg font-semibold text-slate-800">
+            Merchants in selected AEs
+            {selected.size > 0 && (
+              <span className="text-sm font-normal text-slate-500 ml-2">
+                {formatNum(rows.length)} merchant{rows.length === 1 ? "" : "s"}
+                {" "}· {selected.size} AE{selected.size === 1 ? "" : "s"}
+              </span>
+            )}
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={exportExcel}
+          disabled={sorted.length === 0}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors shadow-sm"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="M7 10l5 5 5-5" />
+            <path d="M12 15V3" />
+          </svg>
+          Export Excel
+        </button>
+      </div>
+
+      {selected.size === 0 ? (
+        <div className="py-10 text-center text-slate-400 text-sm">
+          Select one or more AEs above to list their merchants here.
+        </div>
+      ) : sorted.length === 0 ? (
+        <div className="py-10 text-center text-slate-400 text-sm">
+          No merchants with a MID in the selected AEs.
+        </div>
+      ) : (
+        <div className="overflow-x-auto max-h-[600px]">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 sticky top-0 z-10">
+              <tr className="text-left text-slate-600 border-b border-slate-200">
+                <RTh k="ae" sk={sortKey} sd={sortDir} on={toggleSort}>
+                  AE
+                </RTh>
+                <RTh k="code" sk={sortKey} sd={sortDir} on={toggleSort}>
+                  MID
+                </RTh>
+                <RTh k="name" sk={sortKey} sd={sortDir} on={toggleSort}>
+                  Merchant Name (EN)
+                </RTh>
+                <RTh k="status" sk={sortKey} sd={sortDir} on={toggleSort}>
+                  Status
+                </RTh>
+                <RTh k="risk" sk={sortKey} sd={sortDir} on={toggleSort}>
+                  Risk
+                </RTh>
+                <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
+                  Closure Reason
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((m) => (
+                <tr
+                  key={`${m.ae}-${m.code}`}
+                  className="border-b border-slate-100 hover:bg-slate-50"
+                >
+                  <td className="px-4 py-2 font-mono text-xs text-slate-500 whitespace-nowrap">
+                    {m.ae}
+                  </td>
+                  <td className="px-4 py-2 font-mono text-xs font-medium text-slate-800 whitespace-nowrap">
+                    {m.code}
+                  </td>
+                  <td className="px-4 py-2 text-slate-800">
+                    {m.name ?? <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-4 py-2">
+                    <Badge color={STATUS_COLORS[m.status]} text={m.status} />
+                  </td>
+                  <td className="px-4 py-2">
+                    <Badge color={RISK_COLORS[m.risk]} text={m.risk} />
+                  </td>
+                  <td className="px-4 py-2 text-slate-600 max-w-md">
+                    {m.closeReason ?? <span className="text-slate-300">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RTh<K extends string>({
   k,
   sk,
   sd,
@@ -1246,10 +1430,10 @@ function RTh({
   children,
   numeric,
 }: {
-  k: RollupSortKey;
-  sk: RollupSortKey;
+  k: K;
+  sk: K;
   sd: "asc" | "desc";
-  on: (k: RollupSortKey) => void;
+  on: (k: K) => void;
   children: React.ReactNode;
   numeric?: boolean;
 }) {

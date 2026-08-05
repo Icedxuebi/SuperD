@@ -1,43 +1,48 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
-type MerchantRow = {
+type Row = {
+  merchant_id: number;
   merchant_no: string | null;
   partner_no: string | null;
-  merchant_name_en: string | null;
-  email: string | null;
+  display_name: string | null;
+  person_type: string | null;
+  tax_id: string | null;
   state: string | null;
   status: string | null;
-  auto_reject_detail: string | null;
-  approved_date: string | null;
-  store_closure_date: string | null;
-  store_closure_reason: string | null;
+  close_date: string | null;
+  close_remark: string | null;
+  reject_types: string | null;
+  first_listed: string | null;
+  blacklist_name: string | null;
+  bl_rows: number | null;
 };
 
 type SortKey =
   | "merchant_no"
   | "partner_no"
-  | "merchant_name_en"
-  | "email"
+  | "merchant_name"
+  | "tax_id"
   | "state"
   | "status"
-  | "auto_reject_detail"
-  | "approved_date"
-  | "store_closure_date"
-  | "store_closure_reason";
+  | "reject_types"
+  | "first_listed"
+  | "bl_rows"
+  | "close_date"
+  | "close_remark";
 
 type SortDir = "asc" | "desc";
 
 type ApiResponse = {
-  rows: MerchantRow[];
+  rows: Row[];
   total: number;
   page: number;
   pageSize: number;
   sortBy: SortKey;
   sortDir: SortDir;
+  state: string;
   status: string;
 };
 
@@ -63,17 +68,18 @@ const STATE_OPTIONS: { value: string; label: string }[] = [
   { value: "__NULL__", label: "(no state)" },
 ];
 
-const COLUMNS: { key: SortKey; label: string; numeric?: boolean; mono?: boolean }[] = [
-  { key: "merchant_no", label: "Merchant ID", mono: true },
-  { key: "partner_no", label: "Partner No", mono: true },
-  { key: "merchant_name_en", label: "Merchant Name" },
-  { key: "email", label: "Email" },
+const COLUMNS: { key: SortKey; label: string; align?: "right" }[] = [
+  { key: "merchant_no", label: "Merchant ID" },
+  { key: "partner_no", label: "Partner No" },
+  { key: "merchant_name", label: "Merchant Name" },
+  { key: "tax_id", label: "Tax ID" },
   { key: "state", label: "State" },
   { key: "status", label: "Status" },
-  { key: "auto_reject_detail", label: "Auto Reject Detail" },
-  { key: "approved_date", label: "Approved Date", mono: true },
-  { key: "store_closure_date", label: "Store Closure Date", mono: true },
-  { key: "store_closure_reason", label: "Store Closure Reason" },
+  { key: "reject_types", label: "On Lists" },
+  { key: "first_listed", label: "First Listed" },
+  { key: "bl_rows", label: "Entries", align: "right" },
+  { key: "close_date", label: "Store Closure Date" },
+  { key: "close_remark", label: "Store Closure Reason" },
 ];
 
 function formatDate(value: string | null | undefined) {
@@ -100,9 +106,6 @@ function StateBadge({ state }: { state: string | null }) {
   );
 }
 
-// Active / Inactive / Close is the derived status computed in /api/merchants
-// (see the route for the exact rule). Merchants that match none carry a null
-// status and render as an em-dash.
 function StatusBadge({ status }: { status: string | null }) {
   if (!status) return <span className="text-slate-400">—</span>;
   const color =
@@ -118,7 +121,42 @@ function StatusBadge({ status }: { status: string | null }) {
   );
 }
 
-export default function MerchantLookupPage() {
+// AMLO sanctions / terrorism lists are the higher-signal matches; the bulky
+// internal reject registries (APS / CFR / ANP) are shown in a neutral tone.
+function RejectTypeChips({ value }: { value: string | null }) {
+  if (!value) return <span className="text-slate-400">—</span>;
+  const types = value.split(",").map((t) => t.trim()).filter(Boolean);
+  return (
+    <div className="flex flex-wrap gap-1">
+      {types.map((t) => {
+        const isAmlo = t.startsWith("AMLO");
+        const color = isAmlo
+          ? "bg-red-100 text-red-700"
+          : "bg-slate-100 text-slate-600";
+        return (
+          <span
+            key={t}
+            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium font-mono ${color}`}
+          >
+            {t}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function TypeBadge({ personType }: { personType: string | null }) {
+  if (!personType) return null;
+  const label = personType === "C" ? "Company" : personType === "I" ? "Individual" : personType;
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600">
+      {label}
+    </span>
+  );
+}
+
+export default function BlacklistMerchantPage() {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [stateFilter, setStateFilter] = useState("");
@@ -154,7 +192,7 @@ export default function MerchantLookupPage() {
       state: stateFilter,
       status: statusFilter,
     });
-    fetch(`/api/merchants?${params}`)
+    fetch(`/api/blacklist-merchant?${params}`)
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? `Query failed (${res.status})`);
@@ -188,9 +226,9 @@ export default function MerchantLookupPage() {
     return sortDir === "asc" ? " ↑" : " ↓";
   }
 
-  // Exports every merchant matching the current search + filters (all pages, in
-  // the current sort order), not just the visible page. The API caps pageSize at
-  // 100, so we fan out one request per page and stitch the rows back together.
+  // Exports every blacklisted merchant matching the current search + filters
+  // (all pages, current sort). The API caps pageSize at 100, so we fan out one
+  // request per page and stitch the rows together.
   async function exportExcel() {
     if (!data || data.total === 0 || exporting) return;
     setExporting(true);
@@ -209,7 +247,7 @@ export default function MerchantLookupPage() {
       const batches = await Promise.all(
         Array.from({ length: pages }, (_, i) => {
           const params = new URLSearchParams({ ...base, page: String(i + 1) });
-          return fetch(`/api/merchants?${params}`).then(async (res) => {
+          return fetch(`/api/blacklist-merchant?${params}`).then(async (res) => {
             const body = await res.json();
             if (!res.ok) throw new Error(body.error ?? `Export failed (${res.status})`);
             return body as ApiResponse;
@@ -217,25 +255,26 @@ export default function MerchantLookupPage() {
         }),
       );
       const rows = batches.flatMap((b) => b.rows);
-      const dateCell = (v: string | null) =>
-        v ? String(v).replace("T", " ").replace("Z", "").slice(0, 10) : "";
       const sheet = rows.map((r) => ({
-        "Merchant ID": r.merchant_no ?? "",
+        "Merchant ID": r.merchant_no ?? `#${r.merchant_id}`,
         "Partner No": r.partner_no ?? "",
-        "Merchant Name": r.merchant_name_en ?? "",
-        Email: r.email ?? "",
+        "Merchant Name": r.display_name ?? "",
+        Type: r.person_type === "C" ? "Company" : r.person_type === "I" ? "Individual" : (r.person_type ?? ""),
+        "Tax ID": r.tax_id ?? "",
         State: r.state ?? "",
         Status: r.status ?? "",
-        "Auto Reject Detail": r.auto_reject_detail ?? "",
-        "Approved Date": dateCell(r.approved_date),
-        "Store Closure Date": dateCell(r.store_closure_date),
-        "Store Closure Reason": r.store_closure_reason ?? "",
+        "On Lists": r.reject_types ?? "",
+        "Listed Name": r.blacklist_name ?? "",
+        "First Listed": formatDate(r.first_listed),
+        Entries: r.bl_rows ?? 0,
+        "Store Closure Date": formatDate(r.close_date),
+        "Store Closure Reason": r.close_remark ?? "",
       }));
       const ws = XLSX.utils.json_to_sheet(sheet);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Merchants");
+      XLSX.utils.book_append_sheet(wb, ws, "Blacklist Merchants");
       const stamp = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(wb, `merchants-${stamp}.xlsx`);
+      XLSX.writeFile(wb, `blacklist-merchants-${stamp}.xlsx`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Export failed");
     } finally {
@@ -253,8 +292,20 @@ export default function MerchantLookupPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">All Merchants</h1>
-        <p className="text-slate-600">Display registered merchants in the system.</p>
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">Blacklist Merchant</h1>
+        <p className="text-slate-600">
+          Merchants whose tax ID matches an entry on the blocked ID-card list (
+          <span className="font-mono text-sm">blacklist_id_card</span>). Companies match on the
+          corporate tax ID, individuals on the authorized person&apos;s citizen ID.
+        </p>
+      </div>
+
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+        This list is broad — <span className="font-medium">blacklist_id_card</span> doubles as the
+        historical rejected-applicant / fraud registry (APS, CFR, ANP), so most matches are closed
+        or rejected merchants. The high-signal cases are the red{" "}
+        <span className="font-mono text-xs">AMLO_*</span> sanctions / terrorism lists. Confirm
+        identity against the listed name before acting.
       </div>
 
       <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-card flex flex-wrap items-end gap-4">
@@ -264,7 +315,7 @@ export default function MerchantLookupPage() {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by merchant ID, partner no, or merchant name…"
+            placeholder="Search by merchant ID, name, tax ID, or partner no…"
             className="px-3 py-2 border border-slate-300 rounded-md text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none hover:border-slate-400 transition-colors"
           />
         </label>
@@ -346,7 +397,7 @@ export default function MerchantLookupPage() {
           <div className="flex items-center gap-2">
             <span className="inline-block w-1 h-5 rounded-full bg-brand-600" />
             <h3 className="text-lg font-semibold text-slate-800">
-              Merchants
+              Blacklisted Merchants
               {data && (
                 <span className="text-sm font-normal text-slate-500 ml-2">
                   {data.total.toLocaleString()} total
@@ -390,7 +441,9 @@ export default function MerchantLookupPage() {
                   <th
                     key={c.key}
                     onClick={() => onSort(c.key)}
-                    className="px-4 py-2.5 font-semibold cursor-pointer select-none hover:text-slate-900 whitespace-nowrap"
+                    className={`px-4 py-2.5 font-semibold cursor-pointer select-none hover:text-slate-900 whitespace-nowrap ${
+                      c.align === "right" ? "text-right" : ""
+                    }`}
                     aria-sort={
                       sortBy === c.key ? (sortDir === "asc" ? "ascending" : "descending") : "none"
                     }
@@ -399,82 +452,70 @@ export default function MerchantLookupPage() {
                     <span className="text-brand-600">{arrow(c.key)}</span>
                   </th>
                 ))}
-                <th className="px-4 py-2.5 font-semibold whitespace-nowrap text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {!data && loading && (
                 <tr>
-                  <td colSpan={COLUMNS.length + 1} className="text-center py-12 text-slate-500">
+                  <td colSpan={COLUMNS.length} className="text-center py-12 text-slate-500">
                     Loading…
                   </td>
                 </tr>
               )}
               {data && data.rows.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={COLUMNS.length + 1} className="text-center py-12 text-slate-500">
-                    No merchants match this search.
+                  <td colSpan={COLUMNS.length} className="text-center py-12 text-slate-500">
+                    No blacklisted merchants match this search.
                   </td>
                 </tr>
               )}
               {data?.rows.map((r) => (
-                <tr
-                  key={r.merchant_no ?? Math.random()}
-                  className="border-b border-slate-100 hover:bg-slate-50"
-                >
+                <tr key={r.merchant_id} className="border-b border-slate-100 hover:bg-slate-50 align-top">
                   <td className="px-4 py-2 font-mono text-xs text-slate-800 whitespace-nowrap">
-                    {r.merchant_no ?? "—"}
+                    {r.merchant_no ?? `#${r.merchant_id}`}
                   </td>
                   <td className="px-4 py-2 font-mono text-xs whitespace-nowrap">
                     {r.partner_no ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-slate-800">{r.merchant_name_en ?? "—"}</td>
-                  <td className="px-4 py-2 text-slate-700">{r.email ?? "—"}</td>
+                  <td className="px-4 py-2 text-slate-800">
+                    <div className="flex flex-col gap-1">
+                      <span>{r.display_name ?? `#${r.merchant_id}`}</span>
+                      <div className="flex items-center gap-1.5">
+                        <TypeBadge personType={r.person_type} />
+                        {r.blacklist_name && (
+                          <span className="text-xs text-slate-500" title="Name on blacklist entry">
+                            {r.blacklist_name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 font-mono text-xs text-slate-800 whitespace-nowrap">
+                    {r.tax_id ?? "—"}
+                  </td>
                   <td className="px-4 py-2 whitespace-nowrap">
                     <StateBadge state={r.state} />
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap">
                     <StatusBadge status={r.status} />
                   </td>
-                  <td
-                    className="px-4 py-2 text-slate-700 max-w-xs truncate"
-                    title={r.auto_reject_detail ?? ""}
-                  >
-                    {r.auto_reject_detail ?? "—"}
+                  <td className="px-4 py-2">
+                    <RejectTypeChips value={r.reject_types} />
                   </td>
                   <td className="px-4 py-2 font-mono text-xs whitespace-nowrap">
-                    {formatDate(r.approved_date)}
+                    {formatDate(r.first_listed)}
+                  </td>
+                  <td className="px-4 py-2 font-mono text-xs text-right whitespace-nowrap">
+                    {r.bl_rows ?? "—"}
                   </td>
                   <td className="px-4 py-2 font-mono text-xs whitespace-nowrap">
-                    {formatDate(r.store_closure_date)}
+                    {formatDate(r.close_date)}
                   </td>
                   <td
                     className="px-4 py-2 text-slate-700 max-w-xs truncate"
-                    title={r.store_closure_reason ?? ""}
+                    title={r.close_remark ?? ""}
                   >
-                    {r.store_closure_reason ?? "—"}
-                  </td>
-                  <td className="px-4 py-2 text-right whitespace-nowrap">
-                    {r.merchant_no && (
-                      <Link
-                        href={`/application-support/merchant-lookup/${r.merchant_no}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors shadow-sm"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="h-3.5 w-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                        View
-                      </Link>
-                    )}
+                    {r.close_remark ?? "—"}
                   </td>
                 </tr>
               ))}
@@ -515,7 +556,7 @@ function buildPageWindow(current: number, total: number, size: number): (number 
   }
   const half = Math.floor(size / 2);
   let start = Math.max(2, current - half);
-  let end = Math.min(total - 1, start + size - 1);
+  const end = Math.min(total - 1, start + size - 1);
   if (end - start + 1 < size) start = Math.max(2, end - size + 1);
 
   const out: (number | "…")[] = [1];

@@ -6,11 +6,13 @@ import { getCurrentUsername } from "@/lib/current-user";
 
 const applicationSupport: NavItem[] = [
   { label: "Merchant Lookup", href: "/application-support/merchant-lookup" },
+  { label: "Blacklist Merchant", href: "/application-support/blacklist-merchant" },
   { label: "Merchant Status by AE", href: "/application-support/merchant-status-by-ae" },
   { label: "Locked Accounts", href: "/application-support/locked-accounts" },
   { label: "Payment Status", href: "/application-support/payment-status" },
   { label: "Transfer Status", href: "/application-support/transfer-status" },
   { label: "Generate Top 5 Report", href: "/application-support/generate-top5-report" },
+  { label: "Tickets", href: "/application-support/tickets" },
   { label: "Ticket Dashboard", href: "/application-support/ticket-dashboard" },
 ];
 
@@ -26,6 +28,7 @@ const riskManagement: NavItem[] = [
   { label: "No Transaction 90 / 120", href: "/risk-management/no-transaction" },
   { label: "Spender History", href: "/risk-management/spender-history" },
   { label: "Top Spender", href: "/risk-management/top-spender" },
+  { label: "Payout History", href: "/risk-management/payout-history" },
   { label: "Fraud Monitoring Feed", href: "/risk-management/fraud-monitoring" },
   { label: "Blacklist Hit Report", href: "/risk-management/blacklist-hits" },
   { label: "KYC / CDD Period Review", href: "/risk-management/kyc-cdd-review" },

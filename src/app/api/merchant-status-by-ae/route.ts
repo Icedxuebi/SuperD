@@ -4,16 +4,19 @@ import { getPool } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Population = every merchant that is NOT permanently closed. A set close_date
-// means the store is perma-closed → excluded from the page entirely. Within the
-// remaining (open) population:
-//   Active   → fully live: state = 'APPROVE' AND merchant_info.enabled = TRUE
-//              AND their users row is enabled.
-//   Inactive → every other open merchant — i.e. anything still in the onboarding
-//              pipeline and not yet live (BUSINESS_APPROVE, PRE_APPROVE_OPERATION,
-//              REGISTER, REJECT, *_SANDBOX, …), plus any approved-but-disabled
-//              merchant that hasn't been closed. It is the complement of Active
-//              within the open population, so active + inactive = total.
+// Active / Inactive / Close are three independent buckets over APPROVED
+// merchants, keyed on the merchant flag (merchant_info.enabled) and whether the
+// merchant has an enabled users row ("user enabled"). Same rule as
+// /api/merchants (merchant lookup):
+//   Active   → state = 'APPROVE' AND user enabled     AND merchant enabled.
+//   Inactive → state = 'APPROVE' AND user enabled     AND merchant NOT enabled.
+//   Close    → state = 'APPROVE' AND user NOT enabled AND merchant NOT enabled.
+// close_date is not consulted. A merchant that fits none of the three is dropped
+// from the page entirely — the onboarding pipeline (BUSINESS_APPROVE,
+// PRE_APPROVE_*, REGISTER, REJECT, *_SANDBOX, NULL state) plus the leftover
+// approved combo (user NOT enabled AND merchant enabled), which the rule leaves
+// undefined. (/api/partner-merchant-risk keeps that leftover as an "Other"
+// bucket instead; this page drops it, matching how it already drops pipeline.)
 // Each merchant has one users row (users.merchant_id → merchant_info.id), but
 // bool_or keeps the query correct if that ever stops holding.
 //
@@ -26,24 +29,36 @@ WITH per_merchant AS (
         mi.id,
         mi.partner_id,
         (mi.state = 'APPROVE'
-         AND mi.enabled IS TRUE
-         AND COALESCE(bool_or(u.enabled), FALSE)) AS is_active
+         AND COALESCE(bool_or(u.enabled), FALSE)
+         AND mi.enabled IS TRUE)                            AS is_active,
+        (mi.state = 'APPROVE'
+         AND COALESCE(bool_or(u.enabled), FALSE)
+         AND mi.enabled IS FALSE)                           AS is_inactive,
+        (mi.state = 'APPROVE'
+         AND NOT COALESCE(bool_or(u.enabled), FALSE)
+         AND mi.enabled IS FALSE)                           AS is_close
     FROM merchant_info mi
     LEFT JOIN users u ON u.merchant_id = mi.id
-    WHERE mi.close_date IS NULL   -- drop permanently-closed merchants
     GROUP BY mi.id, mi.partner_id, mi.state, mi.enabled
 )
 SELECT
     pi.partner_no                                       AS partner_no,
     COUNT(*) FILTER (WHERE pm.is_active)::int           AS active,
-    COUNT(*) FILTER (WHERE NOT pm.is_active)::int       AS inactive
+    COUNT(*) FILTER (WHERE pm.is_inactive)::int         AS inactive,
+    COUNT(*) FILTER (WHERE pm.is_close)::int            AS close
 FROM per_merchant pm
 LEFT JOIN partner_info pi ON pi.id = pm.partner_id
+WHERE pm.is_active OR pm.is_inactive OR pm.is_close  -- only approved merchants in a bucket; drop pipeline / rejected / sandbox / undefined combo
 GROUP BY pi.partner_no
-ORDER BY active DESC, inactive DESC, partner_no ASC NULLS LAST;
+ORDER BY active DESC, inactive DESC, close DESC, partner_no ASC NULLS LAST;
 `;
 
-type RawRow = { partner_no: string | null; active: number; inactive: number };
+type RawRow = {
+  partner_no: string | null;
+  active: number;
+  inactive: number;
+  close: number;
+};
 
 export async function GET() {
   try {
@@ -55,9 +70,10 @@ export async function GET() {
       (acc, r) => {
         acc.active += r.active;
         acc.inactive += r.inactive;
+        acc.close += r.close;
         return acc;
       },
-      { active: 0, inactive: 0 },
+      { active: 0, inactive: 0, close: 0 },
     );
 
     const partners = result.rows
@@ -66,12 +82,16 @@ export async function GET() {
         partner_no: r.partner_no as string,
         active: r.active,
         inactive: r.inactive,
-        total: r.active + r.inactive,
+        close: r.close,
+        total: r.active + r.inactive + r.close,
       }));
 
     return NextResponse.json({
       partners,
-      totals: { ...totals, total: totals.active + totals.inactive },
+      totals: {
+        ...totals,
+        total: totals.active + totals.inactive + totals.close,
+      },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Query failed";

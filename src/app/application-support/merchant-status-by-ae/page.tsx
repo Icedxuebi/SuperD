@@ -19,25 +19,28 @@ import {
 
 const COLOR_ACTIVE = "#059669"; // emerald-600
 const COLOR_INACTIVE = "#A4262C"; // brand red
+const COLOR_CLOSE = "#1e293b"; // slate-800
 
 type PartnerRow = {
   partner_no: string;
   active: number;
   inactive: number;
+  close: number;
   total: number;
 };
 
 type ApiResponse = {
   partners: PartnerRow[];
-  totals: { active: number; inactive: number; total: number };
+  totals: { active: number; inactive: number; close: number; total: number };
 };
 
-type SortKey = "active" | "inactive" | "total" | "rate" | "partner_no";
+type SortKey = "active" | "inactive" | "close" | "total" | "rate" | "partner_no";
 type SortDir = "asc" | "desc";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "active", label: "Active (most)" },
   { value: "inactive", label: "Inactive (most)" },
+  { value: "close", label: "Close (most)" },
   { value: "rate", label: "Active rate (highest)" },
   { value: "total", label: "Total merchants" },
   { value: "partner_no", label: "Partner number" },
@@ -101,6 +104,8 @@ export default function MerchantStatusByAePage() {
           return dir * (a.active - b.active);
         case "inactive":
           return dir * (a.inactive - b.inactive);
+        case "close":
+          return dir * (a.close - b.close);
         case "total":
           return dir * (a.total - b.total);
         case "rate":
@@ -138,8 +143,10 @@ export default function MerchantStatusByAePage() {
       .slice(0, 5);
   }, [data]);
 
-  const activeRate =
-    data && data.totals.total > 0 ? data.totals.active / data.totals.total : 0;
+  const totals = data?.totals;
+  const activeRate = totals && totals.total > 0 ? totals.active / totals.total : 0;
+  const inactiveRate = totals && totals.total > 0 ? totals.inactive / totals.total : 0;
+  const closeRate = totals && totals.total > 0 ? totals.close / totals.total : 0;
 
   function exportExcel() {
     if (sortedPartners.length === 0) return;
@@ -147,6 +154,7 @@ export default function MerchantStatusByAePage() {
       Partner: p.partner_no,
       Active: p.active,
       Inactive: p.inactive,
+      Close: p.close,
       Total: p.total,
       "Active %": p.total > 0 ? p.active / p.total : 0,
     }));
@@ -155,6 +163,7 @@ export default function MerchantStatusByAePage() {
         Partner: "Total",
         Active: data.totals.active,
         Inactive: data.totals.inactive,
+        Close: data.totals.close,
         Total: data.totals.total,
         "Active %": activeRate,
       });
@@ -163,7 +172,7 @@ export default function MerchantStatusByAePage() {
     // Format the Active % column as a percentage.
     const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
     for (let r = range.s.r + 1; r <= range.e.r; r++) {
-      const cell = ws[XLSX.utils.encode_cell({ r, c: 4 })];
+      const cell = ws[XLSX.utils.encode_cell({ r, c: 5 })];
       if (cell) cell.z = "0.0%";
     }
     const wb = XLSX.utils.book_new();
@@ -248,7 +257,7 @@ export default function MerchantStatusByAePage() {
 
       {data && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <KpiCard
               accent="bg-emerald-500"
               iconBg="bg-emerald-50 text-emerald-600"
@@ -267,11 +276,11 @@ export default function MerchantStatusByAePage() {
               }
               label="Active"
               value={data.totals.active.toLocaleString()}
-              sub={`${formatPct(activeRate)} of operating merchants`}
+              sub={`${formatPct(activeRate)} of approved merchants`}
             />
             <KpiCard
-              accent="bg-slate-500"
-              iconBg="bg-slate-100 text-slate-700"
+              accent="bg-brand-600"
+              iconBg="bg-brand-50 text-brand-600"
               icon={
                 <svg
                   viewBox="0 0 24 24"
@@ -287,11 +296,32 @@ export default function MerchantStatusByAePage() {
               }
               label="Inactive"
               value={data.totals.inactive.toLocaleString()}
-              sub={`${formatPct(1 - activeRate)} of operating merchants`}
+              sub={`${formatPct(inactiveRate)} of approved merchants`}
             />
             <KpiCard
-              accent="bg-brand-600"
-              iconBg="bg-brand-50 text-brand-600"
+              accent="bg-slate-800"
+              iconBg="bg-slate-100 text-slate-800"
+              icon={
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M15 9l-6 6M9 9l6 6" />
+                </svg>
+              }
+              label="Close"
+              value={data.totals.close.toLocaleString()}
+              sub={`${formatPct(closeRate)} of approved merchants`}
+            />
+            <KpiCard
+              accent="bg-slate-500"
+              iconBg="bg-slate-100 text-slate-700"
               icon={
                 <svg
                   viewBox="0 0 24 24"
@@ -305,7 +335,7 @@ export default function MerchantStatusByAePage() {
                   <path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M9 11a4 4 0 100-8 4 4 0 000 8zm6 0a4 4 0 100-8 4 4 0 000 8z" />
                 </svg>
               }
-              label="Operating merchants"
+              label="Approved merchants"
               value={data.totals.total.toLocaleString()}
               sub={`Across ${data.partners.length} partner${data.partners.length === 1 ? "" : "s"}`}
             />
@@ -336,7 +366,7 @@ export default function MerchantStatusByAePage() {
             <div className="flex items-center gap-2 mb-4">
               <span className="inline-block w-1 h-5 rounded-full bg-brand-600" />
               <h3 className="text-lg font-semibold text-slate-800">
-                Active vs Inactive per AE
+                Active / Inactive / Close per AE
                 <span className="text-sm font-normal text-slate-500 ml-2">
                   {topN === 9999
                     ? `${chartData.length} partners`
@@ -366,14 +396,20 @@ export default function MerchantStatusByAePage() {
                     contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0" }}
                     formatter={(value: number, name) => [
                       value.toLocaleString(),
-                      name === "active" ? "Active" : "Inactive",
+                      name === "active"
+                        ? "Active"
+                        : name === "inactive"
+                          ? "Inactive"
+                          : "Close",
                     ]}
                     labelStyle={{ fontWeight: 600 }}
                   />
                   <Legend
                     wrapperStyle={{ fontSize: 12 }}
                     iconType="circle"
-                    formatter={(v) => (v === "active" ? "Active" : "Inactive")}
+                    formatter={(v) =>
+                      v === "active" ? "Active" : v === "inactive" ? "Inactive" : "Close"
+                    }
                   />
                   <Bar dataKey="active" stackId="a" fill={COLOR_ACTIVE} radius={[0, 0, 0, 0]}>
                     <LabelList
@@ -385,9 +421,19 @@ export default function MerchantStatusByAePage() {
                       formatter={(v: number) => (v > 0 ? v.toLocaleString() : "")}
                     />
                   </Bar>
-                  <Bar dataKey="inactive" stackId="a" fill="#A4262C" radius={[0, 4, 4, 0]}>
+                  <Bar dataKey="inactive" stackId="a" fill={COLOR_INACTIVE} radius={[0, 0, 0, 0]}>
                     <LabelList
                       dataKey="inactive"
+                      position="center"
+                      fill="#ffffff"
+                      fontSize={10}
+                      fontWeight={600}
+                      formatter={(v: number) => (v > 0 ? v.toLocaleString() : "")}
+                    />
+                  </Bar>
+                  <Bar dataKey="close" stackId="a" fill={COLOR_CLOSE} radius={[0, 4, 4, 0]}>
+                    <LabelList
+                      dataKey="close"
                       position="center"
                       fill="#ffffff"
                       fontSize={10}
@@ -405,7 +451,9 @@ export default function MerchantStatusByAePage() {
             <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-card">
               <div className="flex items-center gap-2 mb-4">
                 <span className="inline-block w-1 h-5 rounded-full bg-accent-500" />
-                <h3 className="text-lg font-semibold text-slate-800">Active vs Inactive</h3>
+                <h3 className="text-lg font-semibold text-slate-800">
+                  Active / Inactive / Close
+                </h3>
               </div>
               <div style={{ width: "100%", height: 280 }} className="relative">
                 <ResponsiveContainer>
@@ -414,6 +462,7 @@ export default function MerchantStatusByAePage() {
                       data={[
                         { name: "Active", value: data.totals.active, fill: COLOR_ACTIVE },
                         { name: "Inactive", value: data.totals.inactive, fill: COLOR_INACTIVE },
+                        { name: "Close", value: data.totals.close, fill: COLOR_CLOSE },
                       ]}
                       dataKey="value"
                       innerRadius={70}
@@ -423,6 +472,7 @@ export default function MerchantStatusByAePage() {
                     >
                       <Cell fill={COLOR_ACTIVE} />
                       <Cell fill={COLOR_INACTIVE} />
+                      <Cell fill={COLOR_CLOSE} />
                     </Pie>
                     <Tooltip
                       contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0" }}
@@ -437,9 +487,10 @@ export default function MerchantStatusByAePage() {
                   <div className="text-xs text-slate-500 uppercase tracking-wide">Active rate</div>
                 </div>
               </div>
-              <div className="mt-4 flex items-center justify-center gap-6 text-sm">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
                 <LegendDot color={COLOR_ACTIVE} label="Active" value={data.totals.active} />
                 <LegendDot color={COLOR_INACTIVE} label="Inactive" value={data.totals.inactive} />
+                <LegendDot color={COLOR_CLOSE} label="Close" value={data.totals.close} />
               </div>
             </div>
 
@@ -510,6 +561,9 @@ export default function MerchantStatusByAePage() {
                     <SortHeader k="inactive" sortKey={sortKey} sortDir={sortDir} onSort={(k) => toggle(setSortKey, setSortDir, sortKey, sortDir, k)} numeric>
                       Inactive
                     </SortHeader>
+                    <SortHeader k="close" sortKey={sortKey} sortDir={sortDir} onSort={(k) => toggle(setSortKey, setSortDir, sortKey, sortDir, k)} numeric>
+                      Close
+                    </SortHeader>
                     <SortHeader k="total" sortKey={sortKey} sortDir={sortDir} onSort={(k) => toggle(setSortKey, setSortDir, sortKey, sortDir, k)} numeric>
                       Total
                     </SortHeader>
@@ -524,13 +578,17 @@ export default function MerchantStatusByAePage() {
                 <tbody>
                   {sortedPartners.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-slate-500">
-                        No operating merchants for this date.
+                      <td colSpan={7} className="text-center py-12 text-slate-500">
+                        No approved merchants for this date.
                       </td>
                     </tr>
                   )}
                   {sortedPartners.map((p) => {
+                    const denom = p.total > 0 ? p.total : 1;
                     const rate = p.total > 0 ? p.active / p.total : 0;
+                    const activePct = (p.active / denom) * 100;
+                    const inactivePct = (p.inactive / denom) * 100;
+                    const closePct = (p.close / denom) * 100;
                     return (
                       <tr key={p.partner_no} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-4 py-2 font-mono text-xs font-medium text-slate-800 whitespace-nowrap">
@@ -539,8 +597,11 @@ export default function MerchantStatusByAePage() {
                         <td className="px-4 py-2 text-right font-mono font-medium tabular-nums text-emerald-700">
                           {p.active.toLocaleString()}
                         </td>
-                        <td className="px-4 py-2 text-right font-mono font-medium tabular-nums text-slate-600">
+                        <td className="px-4 py-2 text-right font-mono font-medium tabular-nums text-brand-700">
                           {p.inactive.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono font-medium tabular-nums text-slate-800">
+                          {p.close.toLocaleString()}
                         </td>
                         <td className="px-4 py-2 text-right font-mono font-medium tabular-nums text-slate-800">
                           {p.total.toLocaleString()}
@@ -552,13 +613,18 @@ export default function MerchantStatusByAePage() {
                           <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
                             <div
                               className="h-full bg-emerald-500"
-                              style={{ width: `${rate * 100}%` }}
+                              style={{ width: `${activePct}%` }}
                               title={`Active: ${p.active} (${formatPct(rate)})`}
                             />
                             <div
-                              className="h-full bg-slate-300"
-                              style={{ width: `${(1 - rate) * 100}%` }}
-                              title={`Inactive: ${p.inactive} (${formatPct(1 - rate)})`}
+                              className="h-full bg-brand-500"
+                              style={{ width: `${inactivePct}%` }}
+                              title={`Inactive: ${p.inactive} (${formatPct(p.total > 0 ? p.inactive / p.total : 0)})`}
+                            />
+                            <div
+                              className="h-full bg-slate-800"
+                              style={{ width: `${closePct}%` }}
+                              title={`Close: ${p.close} (${formatPct(p.total > 0 ? p.close / p.total : 0)})`}
                             />
                           </div>
                         </td>
