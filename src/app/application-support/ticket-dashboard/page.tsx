@@ -478,7 +478,7 @@ function Dashboard({ tickets }: { tickets: TicketRow[] }) {
           <span className="text-sm font-semibold text-slate-600">
             TOTAL :{" "}
             <span className="text-brand-600">
-              {formatNum(stats.total + stats.merchantTickets)}
+              {formatNum(stats.total)}
             </span>
           </span>
         }

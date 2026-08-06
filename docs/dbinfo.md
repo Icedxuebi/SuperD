@@ -11,6 +11,7 @@
 ## Key Observations
 
 - **Primary merchant search key:** `merchant_info.merchant_no` — this is the MID (e.g. `M250701022505`) used to identify merchants in reports, police case exports, and all external-facing queries. Always join via `merchant_info` and filter on `merchant_no`; do not use the internal `merchant_info.id` as the input parameter.
+- **`merchant_no` is NULL until final approval.** A MID is only issued when a merchant reaches `state = 'APPROVE'`; rows in `BUSINESS_APPROVE`, `PRE_APPROVE_OPERATION` and `REJECT` have a NULL `merchant_no` but still carry names and a `partner_id`. This is common — for partner 27, 27 of 53 merchants had no MID (2026-08-05). Any per-AE roster export must join on `merchant_info.id`, not `merchant_no`, or it silently drops half the book; carry `state` alongside `merchant_no` so blank MIDs are self-explaining.
 - **AE / partner link:** Every merchant is linked to an AE/partner via `merchant_info.partner_id → partner_info.id`. Use `partner_info.partner_no` as the AE identifier in reports and exports. `registration_channel_partner_details` on `merchant_info` is a free-text field that is often blank — do not use it.
 - **Scale:** ~250 GB total, dominated by transaction + recon data
 - **Thai platform:** Address tables use Thai admin divisions (province/district/sub_district); Thai name fields throughout
@@ -507,6 +508,23 @@ Full list of `key1` categories (102 distinct keys):
 |---|---|
 | `BUSINESS_CATEGORY` | Top-level business category (Automotive, Food & Beverage, etc.) |
 | `BUSINESS_GROUP` | MCC-linked sub-categories under BUSINESS_CATEGORY (key2 = category ID, mcc = MCC code) |
+
+**`master_data.mcc` is the canonical MCC source** (verified 2026-08-05). All 181 `BUSINESS_GROUP`
+rows carry an `mcc`; only 13 of 24 `BUSINESS_CATEGORY` rows do, so always resolve MCC through
+`merchant_info.business_group_id`, not `business_category_id`:
+
+```sql
+LEFT JOIN master_data bg
+       ON bg.id::text = mi.business_group_id::text
+      AND bg.key1 = 'BUSINESS_GROUP'   -- bg.mcc, bg.name_th
+```
+
+Spot-checked against the regulatory monthly workbook
+(`ข้อมูลร้านค้าทั้งหมด ประจำเดือน…xlsx`, sheet `Merchant`, cols J/K): **26 of 26 merchants agreed
+exactly on both MCC code and group name**. Do not re-derive MCC from that spreadsheet — query the
+DB, which also covers merchants that have no MID yet and are therefore absent from the report.
+Use a `LEFT JOIN`: `business_group_id` is NULL for merchants that stalled before the business
+review step.
 | `BUSINESS_TYPE` | Operational type: agent, manufacturer, wholesaler, service, other |
 | `COMPANY_TYPE` | Legal structure: Company Limited, Public Company, Partnership, Other |
 | `COMPANY_INCOME_RANGE` | Revenue brackets (e.g., <10M, 10–50M, ..., >5,000M THB) |
@@ -661,6 +679,6 @@ Used by `/operation/duplicate-tax-id` and `/operation/duplicate-phone`:
 ## Still To Learn
 
 - [ ] gateway_info rows (only 4 — which acquirers/banks?)
-- [ ] Distinct values of `payment_transaction.status` (pay_type / payment_type catalogued 2026-06-02 — see column table above)
-- [ ] Distinct values of `transfer_transaction.status`, `type`, `payment_type`
+- [x] Distinct values of `payment_transaction.status` — `S` success, `G` generated/unpaid QR, `C` cancelled. Sampled 2026-08-05 across all 1.28M rows for partner 27 (not a full-table catalogue): S 1,136,317 · G 146,015 · C 63. `G` is ~11% of rows by count and must be excluded from revenue figures.
+- [x] Distinct values of `transfer_transaction.status`, `type` — status `S` success / `E` failed; type `Withdraw` (dominant), `Transfer`, `Settlement`. Same 2026-08-05 partner-27 sample; `payment_type` still uncatalogued. Failed withdrawals are material (95,522 rows / ฿186M for that partner alone) — always filter `status = 'S'` for volume reporting.
 - [ ] Webhook `type` + `status` distribution
