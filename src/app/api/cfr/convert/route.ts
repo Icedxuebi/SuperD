@@ -5,6 +5,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB — bank case files are tiny in practice
+const MAX_FILES = 20;
+
+/** One source workbook's outcome — either its converted files, or why it failed. */
+interface SourceResult {
+  sourceName: string;
+  caseId?: string;
+  files?: { name: string; sheet: string; rows: number; base64: string }[];
+  skipped?: { sheet: string; reason: string }[];
+  error?: string;
+}
 
 export async function POST(req: Request) {
   let form: FormData;
@@ -17,63 +27,92 @@ export async function POST(req: Request) {
     );
   }
 
-  const file = form.get("file");
   // `File` became a global only in Node 20; an older prod runtime throws
-  // "File is not defined" on `file instanceof File`, crashing the handler before
+  // "File is not defined" on `entry instanceof File`, crashing the handler before
   // it can return. Narrow without touching the global File constructor — a
   // FormData entry is either a string (non-file field) or a File (extends Blob).
-  if (file === null || typeof file === "string") {
+  const uploads = form
+    .getAll("file")
+    .filter((entry): entry is File => entry !== null && typeof entry !== "string");
+
+  if (uploads.length === 0) {
     return NextResponse.json(
       { error: 'No file uploaded. Attach the Bank Case ID .xlsx as "file".' },
       { status: 400 },
     );
   }
-  if (!file.name.toLowerCase().endsWith(".xlsx")) {
+  if (uploads.length > MAX_FILES) {
     return NextResponse.json(
-      { error: "Please upload a .xlsx file (the Bank Case ID workbook)." },
+      { error: `Too many files (max ${MAX_FILES} per upload).` },
       { status: 400 },
     );
   }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json(
-      { error: "File is too large (max 25 MB)." },
-      { status: 413 },
-    );
+
+  // Each workbook is converted independently, exactly as if it had been uploaded
+  // on its own — one bad file never takes the rest of the batch down with it.
+  const results: SourceResult[] = [];
+  for (const file of uploads) {
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      results.push({
+        sourceName: file.name,
+        error: "Not a .xlsx file (expected a Bank Case ID workbook).",
+      });
+      continue;
+    }
+    if (file.size > MAX_BYTES) {
+      results.push({ sourceName: file.name, error: "File is too large (max 25 MB)." });
+      continue;
+    }
+
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const result = await convertWorkbook(buffer, file.name);
+      if (result.files.length === 0) {
+        results.push({
+          sourceName: file.name,
+          caseId: result.caseId,
+          error:
+            "No output files were created — the workbook had no usable data rows.",
+          skipped: result.skipped,
+        });
+        continue;
+      }
+      results.push({
+        sourceName: file.name,
+        caseId: result.caseId,
+        files: result.files.map((f) => ({
+          name: f.name,
+          sheet: f.sheet,
+          rows: f.rows,
+          base64: f.buffer.toString("base64"),
+        })),
+        skipped: result.skipped,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Conversion failed unexpectedly.";
+      console.error("[/api/cfr/convert]", file.name, err);
+      results.push({ sourceName: file.name, error: message });
+    }
   }
 
-  let result;
-  try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    result = await convertWorkbook(buffer, file.name);
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Conversion failed unexpectedly.";
-    console.error("[/api/cfr/convert]", err);
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-
-  if (result.files.length === 0) {
+  // Only fail the whole request when nothing at all converted; otherwise the
+  // client renders the per-file errors alongside the successes.
+  if (results.every((r) => r.error)) {
     return NextResponse.json(
       {
         error:
-          "No output files were created — the workbook had no usable data rows.",
-        skipped: result.skipped,
+          results.length === 1
+            ? results[0].error
+            : "None of the uploaded workbooks could be converted.",
+        results,
       },
       { status: 422 },
     );
   }
 
   return NextResponse.json(
-    {
-      caseId: result.caseId,
-      files: result.files.map((f) => ({
-        name: f.name,
-        sheet: f.sheet,
-        rows: f.rows,
-        base64: f.buffer.toString("base64"),
-      })),
-      skipped: result.skipped,
-    },
+    { results },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
