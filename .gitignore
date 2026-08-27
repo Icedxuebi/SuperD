@@ -8,6 +8,7 @@ CLAUDE.md
 .env
 .env.local
 .env.*.local
+*.sql
 
 # logs
 npm-debug.log*
@@ -40,6 +41,9 @@ Transaction_*.csv
 # Generated report workbooks (scripts/gen-*.mjs) — production data
 sd/
 AE*_merchants_summary.xlsx
+
+# Daily reconciliation exports (scripts/_run_rec_ultimate_to_csv.mjs) — production data
+files/
 
 
 
